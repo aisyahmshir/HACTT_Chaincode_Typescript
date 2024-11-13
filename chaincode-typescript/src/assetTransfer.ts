@@ -234,18 +234,18 @@ export class AssetTransferContract extends Contract {
 
     private async getHistoryForKey(ctx: Context, key: string): Promise<any[]> {
         const historyResults = [];
-
+    
         try {
             // Use ctx.stub.getHistoryForKey directly to retrieve the history of the asset key
             const iterator = await ctx.stub.getHistoryForKey(key);
-
+    
             let result = await iterator.next();
             while (!result.done) {
                 const record = {
                     TxId: result.value.txId,
                     Timestamp: result.value.timestamp,
                     IsDelete: result.value.isDelete,
-                    Value: result.value.value.toString('utf8'),
+                    Value: this.parseValue(Buffer.from(result.value.value)),
                 };
                 historyResults.push(record);
                 result = await iterator.next();
@@ -254,9 +254,22 @@ export class AssetTransferContract extends Contract {
             console.error(`Error fetching history for key ${key}:`, error);
             throw new Error(`Failed to fetch history for key: ${key}`);
         }
-
+    
         return historyResults;
     }
+    
+    // Helper function to parse the value as JSON
+    private parseValue(value: Buffer): any {
+        try {
+            // Attempt to parse the value directly as JSON
+            return JSON.parse(value.toString());
+        } catch (error) {
+            // If parsing fails, return the string value
+            console.warn("Failed to parse JSON, returning as string.");
+            return value.toString();
+        }
+    }
+    
 
     //  returns the ID associated with the invoking identity. 
     @Transaction(false)
