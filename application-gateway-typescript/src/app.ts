@@ -131,6 +131,17 @@ async function main(): Promise<void> {
             res.send(JSON.stringify(successMessage));
         })
 
+        app.get('/getAllTestPlansWithHistory', async (req: any, res: any) => {
+            try {
+                const allResults = await getAllTestPlansWithHistory(contract);
+                const successMessage = { status: 'success', message: allResults };
+                res.send(JSON.stringify(successMessage)); // Only response sent
+            } catch (error) {
+                console.error('Error fetching test cases:', error);
+                res.status(500).json({ status: 'error', message: 'Failed to fetch test cases' });
+            }
+        });
+
         // Create a new asset on the ledger.
         app.post('/createTestCase', async (req: any, res: any) => {
             console.log("Create Test Case:")
@@ -236,12 +247,12 @@ async function main(): Promise<void> {
             console.log(req.body);
             try {
                 await createTestPlan(contract, req.body.tpID, req.body.tpName, req.body.tpDesc, req.body.createdBy,
-                    req.body.dateCreated, req.body.isActive, req.body.isPublic);
+                req.body.dateCreated, req.body.isActive, req.body.isPublic);
                 const successMessage = { status: 'success', message: '*** Transaction createAsset committed successfully' };
                 res.send(JSON.stringify(successMessage));
             } catch (error) {
                 console.error(`Failed to create test plan: ${error}`);
-                res.status(500).json({ error: error.message });
+                res.status(500).json({ error: error.message});
             }
         });
 
@@ -266,24 +277,25 @@ async function main(): Promise<void> {
         //update test plan
         app.post('/updateTestPlan', async (req: any, res: any) => {
             console.log('Received request body:', req.body);
-
+          
             // Check if required fields (id) are present
             if (!req.body.tpID) {
-                return res.status(400).json({ error: 'Missing required field: id' });
+              return res.status(400).json({ error: 'Missing required field: id' });
             }
             console.log("Update Test Plan:")
             console.log(req.body);
-
+          
             try {
-                await UpdateTestPlan(contract, req.body.tpID, req.body.tpName, req.body.tpDesc, req.body.createdBy,
-                    req.body.dateCreated, req.body.isActive, req.body.isPublic);
-                const successMessage = { status: 'success', message: 'Test plan updated successfully' };
-                res.send(JSON.stringify(successMessage));
+              await UpdateTestPlan(contract, req.body.tpID, req.body.tpName, req.body.tpDesc, req.body.createdBy,
+                req.body.dateCreated, req.body.isActive, req.body.isPublic);
+              const successMessage = { status: 'success', message: 'Test plan updated successfully' };
+              res.send(JSON.stringify(successMessage));
             } catch (error) {
-                console.error('Error updating test plan:', error);
-                res.status(500).json({ error: error.message });
+              console.error('Error updating test plan:', error);
+              res.status(500).json({ error: error.message});
             }
-        });
+          });
+
 
         // returns the ID associated with the invoking identity.
         app.get('/getClientID', async (req: any, res: any) => {
@@ -309,9 +321,11 @@ async function main(): Promise<void> {
         // Get all test cases on the ledger.
         await getAllTestCases(contract);
 
-        await getAllTestCasesWithHistory(contract);
+        await getAllTestCasesWithHistory(contract, id);
 
         await getAllTestPlans(contract);
+
+        await getAllTestPlansWithHistory(contract);
 
         // Update an existing asset asynchronously.
         // await transferAssetAsync(contract);
@@ -389,8 +403,14 @@ async function getAllTestCasesWithHistory(contract: Contract): Promise<void> {
 
     const resultJson = utf8Decoder.decode(resultBytes);
     const result = JSON.parse(resultJson);
-    console.log('*** Result:', result);
-    return result;
+
+    // Filter assets that have the property `idtest_cases`
+    const filteredAssets = result.filter(
+        (asset: any) => asset.history[0]?.Value?.idtest_cases !== undefined
+    );
+
+    console.log('*** Result:', filteredAssets);
+    return filteredAssets;
 }
 
 /**
@@ -431,6 +451,24 @@ async function getAllTestPlans(contract: Contract): Promise<void> {
     console.log('*** Result:', result);
     return result;
 }
+
+async function getAllTestPlansWithHistory(contract: Contract): Promise<void> {
+    console.log('\n--> Evaluate Transaction: GetAllTestPlansWithHistory, function returns all the current test plans with their history on the ledger');
+
+    const resultBytes = await contract.evaluateTransaction('GetAllAssetsWithHistory');
+
+    const resultJson = utf8Decoder.decode(resultBytes);
+    const result = JSON.parse(resultJson);
+
+    // Filter assets that have the property idtest_cases
+    const filteredAssets = result.filter(
+        (asset: any) => asset.history[0]?.Value?.testPlanID !== undefined
+    );
+
+    console.log('*** Result:', filteredAssets);
+    return filteredAssets;
+}
+
 
 //function test plan
 async function createTestPlan(contract: Contract, tpID: string, tpName: string, tpDesc: string, createdBy: string, dateCreated: string, isActive: string, isPublic: string): Promise<void> {
@@ -498,6 +536,7 @@ async function UpdateTestPlan(contract: Contract, tpID: string, tpName: string, 
 
     console.log('*** Transaction committed successfully (Test Plan updated)');
 }
+
 
 // update only overall status of the asset
 async function UpdateTestCaseStatus(contract: Contract, id: string, ostts: string): Promise<void> {

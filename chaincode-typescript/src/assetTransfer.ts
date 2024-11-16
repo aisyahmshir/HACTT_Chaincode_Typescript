@@ -280,7 +280,7 @@ export class AssetTransferContract extends Contract {
     }
 
     //TEST PLAN
-    @Transaction()
+@Transaction()
     public async CreateTestPlan(ctx: Context, tpID: string, tpName: string, tpDesc: string, createdBy: string, dateCreated: string, isActive: string, isPublic: string): Promise<void> {
         const exists = await this.testPlanExists(ctx, tpID);
         if (exists) {
