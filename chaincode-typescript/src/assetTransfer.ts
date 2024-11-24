@@ -234,11 +234,11 @@ export class AssetTransferContract extends Contract {
 
     private async getHistoryForKey(ctx: Context, key: string): Promise<any[]> {
         const historyResults = [];
-    
+
         try {
             // Use ctx.stub.getHistoryForKey directly to retrieve the history of the asset key
             const iterator = await ctx.stub.getHistoryForKey(key);
-    
+
             let result = await iterator.next();
             while (!result.done) {
                 const record = {
@@ -254,10 +254,10 @@ export class AssetTransferContract extends Contract {
             console.error(`Error fetching history for key ${key}:`, error);
             throw new Error(`Failed to fetch history for key: ${key}`);
         }
-    
+
         return historyResults;
     }
-    
+
     // Helper function to parse the value as JSON
     private parseValue(value: Buffer): any {
         try {
@@ -269,7 +269,7 @@ export class AssetTransferContract extends Contract {
             return value.toString();
         }
     }
-    
+
 
     //  returns the ID associated with the invoking identity. 
     @Transaction(false)
@@ -280,7 +280,7 @@ export class AssetTransferContract extends Contract {
     }
 
     //TEST PLAN
-@Transaction()
+    @Transaction()
     public async CreateTestPlan(ctx: Context, tpID: string, tpName: string, tpDesc: string, createdBy: string, dateCreated: string, isActive: string, isPublic: string): Promise<void> {
         const exists = await this.testPlanExists(ctx, tpID);
         if (exists) {
@@ -339,6 +339,27 @@ export class AssetTransferContract extends Contract {
 
         // Return only the test plan records as a JSON array
         return JSON.stringify(tpResults);
+    }
+
+    @Transaction(false)
+    @Returns('string')
+    public async GetTestPlanById(ctx: Context, testPlanID: string): Promise<string> {
+        // Check if the test plan exists
+        const exists = await this.testPlanExists(ctx, testPlanID);
+        if (!exists) {
+            throw new Error(`Test Plan with ID ${testPlanID} does not exist`);
+        }
+
+        // Get the test plan from the world state
+        const testPlanBytes = await ctx.stub.getState(testPlanID);
+
+        if (!testPlanBytes || testPlanBytes.length === 0) {
+            throw new Error(`Test Plan with ID ${testPlanID} is empty or does not exist`);
+        }
+
+        // Convert test plan bytes to a string and return
+        const testPlan = testPlanBytes.toString();
+        return testPlan;
     }
 
     //delete test plan

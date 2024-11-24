@@ -247,12 +247,12 @@ async function main(): Promise<void> {
             console.log(req.body);
             try {
                 await createTestPlan(contract, req.body.tpID, req.body.tpName, req.body.tpDesc, req.body.createdBy,
-                req.body.dateCreated, req.body.isActive, req.body.isPublic);
+                    req.body.dateCreated, req.body.isActive, req.body.isPublic);
                 const successMessage = { status: 'success', message: '*** Transaction createAsset committed successfully' };
                 res.send(JSON.stringify(successMessage));
             } catch (error) {
                 console.error(`Failed to create test plan: ${error}`);
-                res.status(500).json({ error: error.message});
+                res.status(500).json({ error: error.message });
             }
         });
 
@@ -277,25 +277,45 @@ async function main(): Promise<void> {
         //update test plan
         app.post('/updateTestPlan', async (req: any, res: any) => {
             console.log('Received request body:', req.body);
-          
+
             // Check if required fields (id) are present
             if (!req.body.tpID) {
-              return res.status(400).json({ error: 'Missing required field: id' });
+                return res.status(400).json({ error: 'Missing required field: id' });
             }
             console.log("Update Test Plan:")
             console.log(req.body);
-          
-            try {
-              await UpdateTestPlan(contract, req.body.tpID, req.body.tpName, req.body.tpDesc, req.body.createdBy,
-                req.body.dateCreated, req.body.isActive, req.body.isPublic);
-              const successMessage = { status: 'success', message: 'Test plan updated successfully' };
-              res.send(JSON.stringify(successMessage));
-            } catch (error) {
-              console.error('Error updating test plan:', error);
-              res.status(500).json({ error: error.message});
-            }
-          });
 
+            try {
+                await UpdateTestPlan(contract, req.body.tpID, req.body.tpName, req.body.tpDesc, req.body.createdBy,
+                    req.body.dateCreated, req.body.isActive, req.body.isPublic);
+                const successMessage = { status: 'success', message: 'Test plan updated successfully' };
+                res.send(JSON.stringify(successMessage));
+            } catch (error) {
+                console.error('Error updating test plan:', error);
+                res.status(500).json({ error: error.message });
+            }
+        });
+
+        app.get('/getTestPlanById/:id', async (req: any, res: any) => {
+            try {
+                const testPlanID = req.params.id;
+
+                if (!testPlanID) {
+                    return res.status(400).json({ error: 'Missing required path parameter: id' });
+                }
+
+                const testPlanDetails = await GetTestPlanById(contract, testPlanID);
+                res.status(200).json(testPlanDetails);
+            } catch (error) {
+                console.error('Error fetching test plan:', error.message);
+
+                if (error.message.includes('does not exist')) {
+                    res.status(404).json({ error: `Test Plan with ID ${req.params.id} does not exist.` });
+                } else {
+                    res.status(500).json({ error: 'Failed to retrieve test plan.' });
+                }
+            }
+        });
 
         // returns the ID associated with the invoking identity.
         app.get('/getClientID', async (req: any, res: any) => {
@@ -470,6 +490,8 @@ async function getAllTestPlansWithHistory(contract: Contract): Promise<void> {
 }
 
 
+
+
 //function test plan
 async function createTestPlan(contract: Contract, tpID: string, tpName: string, tpDesc: string, createdBy: string, dateCreated: string, isActive: string, isPublic: string): Promise<void> {
     console.log('\n--> Submit Transaction: CreateTestPlan, creates new asset with ID, Project ID, etc arguments');
@@ -535,6 +557,25 @@ async function UpdateTestPlan(contract: Contract, tpID: string, tpName: string, 
     );
 
     console.log('*** Transaction committed successfully (Test Plan updated)');
+}
+
+async function GetTestPlanById(contract: Contract, testPlanID: string): Promise<any> {
+    console.log(`\n--> Evaluate Transaction: GetTestPlanById, fetching test plan details for ID: ${testPlanID}`);
+
+    try {
+        // Evaluate the transaction to query the test plan by ID
+        const resultBytes = await contract.evaluateTransaction('GetTestPlanById', testPlanID);
+
+        // Decode the response and parse the JSON
+        const resultJson = utf8Decoder.decode(resultBytes);
+        const result = JSON.parse(resultJson);
+
+        console.log('*** Result:', result);
+        return result;
+    } catch (error) {
+        console.error(`Error fetching Test Plan with ID ${testPlanID}:`, error);
+        throw new Error(`Failed to fetch Test Plan with ID ${testPlanID}. Error: ${error.message}`);
+    }
 }
 
 

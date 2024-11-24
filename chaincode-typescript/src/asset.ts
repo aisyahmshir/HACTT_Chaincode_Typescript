@@ -75,10 +75,10 @@ export class TestPlanAsset {
   public description: string;
 
   @Property()
-  public isActive: boolean;
+  public isActive: string;
 
   @Property()
-  public isPublic: boolean;
+  public isPublic: string;
 
 
   @Property()
