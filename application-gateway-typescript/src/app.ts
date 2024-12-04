@@ -101,11 +101,11 @@ async function main(): Promise<void> {
         app.use(bodyParser.urlencoded({ extended: true }));
         app.use(bodyParser.json());
 
-        app.get('/initLedger', async (req: any, res: any) => {
-            await initLedger(contract); // calls InitLedger function from smart contract
-            const successMessage = { status: 'success', message: '*** Transaction initLedger committed successfully' };
-            res.send(JSON.stringify(successMessage));
-        })
+        // app.get('/initLedger', async (req: any, res: any) => {
+        //     await initLedger(contract); // calls InitLedger function from smart contract
+        //     const successMessage = { status: 'success', message: '*** Transaction initLedger committed successfully' };
+        //     res.send(JSON.stringify(successMessage));
+        // })
 
         app.get('/getAllTestCases', async (req: any, res: any) => {
             const allResults = await getAllTestCases(contract);
@@ -125,11 +125,22 @@ async function main(): Promise<void> {
         });
 
         app.get('/getAllTestPlans', async (req: any, res: any) => {
+            try {
+                const allResults = await getAllTestPlans(contract);
+                const successMessage = { status: 'success', message: allResults };
 
-            const allResults = await getAllTestPlans(contract);
-            const successMessage = { status: 'success', message: allResults };
-            res.send(JSON.stringify(successMessage));
-        })
+                // Explicitly set the Content-Type header to application/json
+                res.setHeader('Content-Type', 'application/json');
+                res.status(200).json(successMessage);
+            } catch (error) {
+                console.error("Error retrieving test plans:", error);
+
+                // Return an error response as JSON
+                res.setHeader('Content-Type', 'application/json');
+                res.status(500).json({ status: 'error', message: 'Failed to retrieve test plans', error: error.message });
+            }
+        });
+
 
         app.get('/getAllTestPlansWithHistory', async (req: any, res: any) => {
             try {
@@ -158,8 +169,6 @@ async function main(): Promise<void> {
             }
 
         })
-
-
 
         // Update a test case
         app.post('/updateTestCase', async (req: any, res: any) => {
@@ -256,6 +265,29 @@ async function main(): Promise<void> {
             }
         });
 
+        app.get('/getLatestTestPlanID', async (req: any, res: any) => {
+            try {
+                // Call the GetLatestTestPlanID method in your chaincode
+                const latestID = await GetLatestTestPlanID(contract); // Replace 'contract' with your actual contract object
+
+                // Ensure the result is a string (it could be a Buffer, so we convert it to a string)
+                const latestIDString = latestID.toString().trim(); // Use .trim() to remove any extra spaces or newline chars
+
+                // Handle the case where there is no test plan ID or if the result is invalid
+                if (!latestIDString || latestIDString === 'No test plans found') {
+                    return res.status(404).json({ error: 'No test plans found or ID could not be determined' });
+                }
+
+                // Return the latest test plan ID as a JSON response
+                return res.json({ latestTestPlanID: latestIDString.toString() });
+            } catch (error) {
+                console.error('Error fetching latest test plan ID:', error);
+                res.status(500).json({ error: error.message });
+            }
+        });
+
+
+
         //delete test plan
         app.delete('/deleteTestPlan', async (req: any, res: any) => {
             console.log('Received request body:', req.body);
@@ -274,28 +306,6 @@ async function main(): Promise<void> {
             }
         })
 
-        //update test plan
-        app.post('/updateTestPlan', async (req: any, res: any) => {
-            console.log('Received request body:', req.body);
-
-            // Check if required fields (id) are present
-            if (!req.body.tpID) {
-                return res.status(400).json({ error: 'Missing required field: id' });
-            }
-            console.log("Update Test Plan:")
-            console.log(req.body);
-
-            try {
-                await UpdateTestPlan(contract, req.body.tpID, req.body.tpName, req.body.tpDesc, req.body.createdBy,
-                    req.body.dateCreated, req.body.isActive, req.body.isPublic);
-                const successMessage = { status: 'success', message: 'Test plan updated successfully' };
-                res.send(JSON.stringify(successMessage));
-            } catch (error) {
-                console.error('Error updating test plan:', error);
-                res.status(500).json({ error: error.message });
-            }
-        });
-
         app.get('/getTestPlanById/:id', async (req: any, res: any) => {
             try {
                 const testPlanID = req.params.id;
@@ -310,12 +320,34 @@ async function main(): Promise<void> {
                 console.error('Error fetching test plan:', error.message);
 
                 if (error.message.includes('does not exist')) {
-                    res.status(404).json({ error: `Test Plan with ID ${req.params.id} does not exist.` });
+                    res.status(404).json({ error: "Test Plan with ID ${req.params.id} does not exist. " });
                 } else {
                     res.status(500).json({ error: 'Failed to retrieve test plan.' });
                 }
             }
         });
+
+        //update test plan
+        app.post('/updateTestPlan', async (req: any, res: any) => {
+            console.log('Received request body:', req.body);
+
+            // Check if required fields (id) are present
+            if (!req.body.tpID) {
+                return res.status(400).json({ error: 'Missing required field: id' });
+            }
+            console.log("Update Test Plan:")
+            console.log(req.body);
+
+            try {
+                await UpdateTestPlan(contract, req.body.tpID, req.body.tpName, req.body.tpDesc, req.body.createdBy, req.body.dateCreated, req.body.updatedBy, req.body.dateUpdated, req.body.isActive, req.body.isPublic);
+                const successMessage = { status: 'success', message: 'Test plan updated successfully' };
+                res.send(JSON.stringify(successMessage));
+            } catch (error) {
+                console.error('Error updating test plan:', error);
+                res.status(500).json({ error: error.message });
+            }
+        });
+
 
         // returns the ID associated with the invoking identity.
         app.get('/getClientID', async (req: any, res: any) => {
@@ -333,7 +365,7 @@ async function main(): Promise<void> {
         // console.log(`Example app listening on port`)
 
         // Create a new asset on the ledger.
-        await initLedger(contract);
+        // await initLedger(contract);
 
         // Create a new asset on the ledger.
         // await createAsset(contract);
@@ -341,12 +373,15 @@ async function main(): Promise<void> {
         // Get all test cases on the ledger.
         await getAllTestCases(contract);
 
-        await getAllTestCasesWithHistory(contract, id);
+        await getAllTestCasesWithHistory(contract);
 
         await getAllTestPlans(contract);
 
         await getAllTestPlansWithHistory(contract);
 
+        await GetTestPlanById(contract, id)
+
+        await GetLatestTestPlanID(contract);
         // Update an existing asset asynchronously.
         // await transferAssetAsync(contract);
 
@@ -392,14 +427,14 @@ async function newSigner(): Promise<Signer> {
 /**
  * This type of transaction would typically only be run once by an application the first time it was started after its
  * initial deployment. A new version of the chaincode deployed later would likely not need to run an "init" function.
- */
-async function initLedger(contract: Contract): Promise<void> {
-    console.log('\n--> Submit Transaction: InitLedger, function creates the initial set of assets on the ledger');
+//  */
+// async function initLedger(contract: Contract): Promise<void> {
+//     console.log('\n--> Submit Transaction: InitLedger, function creates the initial set of assets on the ledger');
 
-    await contract.submitTransaction('InitLedger');
+//     await contract.submitTransaction('InitLedger');
 
-    console.log('*** Transaction committed successfully');
-}
+//     console.log('*** Transaction committed successfully');
+// }
 
 /**
  * Evaluate a transaction to query ledger state.
@@ -489,8 +524,51 @@ async function getAllTestPlansWithHistory(contract: Contract): Promise<void> {
     return filteredAssets;
 }
 
+async function GetLatestTestPlanID(contract: Contract): Promise<string> {
+    try {
+        console.log('\n--> Evaluate Transaction: GetLatestTestPlanID, fetching the latest test plan ID');
+
+        // Call the chaincode function to get the latest test plan ID
+        const resultBytes = await contract.evaluateTransaction('GetLatestTestPlanID');
+
+        // Decode the result (assuming it's a Buffer)
+        const resultJson = utf8Decoder.decode(resultBytes).trim(); // Trim any extra spaces or newline chars
+
+        // If the result is empty or invalid, handle accordingly
+        if (!resultJson || resultJson === 'No test plans found') {
+            throw new Error('No test plans found or unable to determine the latest ID');
+        }
+
+        console.log('*** Latest Test Plan ID:', resultJson);
+
+        // Return the latest test plan ID as a string
+        return resultJson;
+    } catch (error) {
+        console.error('Error fetching latest test plan ID:', error);
+        throw new Error(`Failed to fetch latest test plan ID: ${error.message}`);
+    }
+}
 
 
+async function GetTestPlanById(contract: Contract, testPlanID: string): Promise<any> {
+    console.log("\n--> Evaluate Transaction: GetTestPlanById, fetching test plan details for ID: ${testPlanID}");
+
+    try {
+        // Evaluate the transaction to query the test plan by ID
+        const resultBytes = await contract.evaluateTransaction('GetTestPlanById', testPlanID);
+
+        // Decode the response and parse the JSON
+        const resultJson = utf8Decoder.decode(resultBytes);
+        const result = JSON.parse(resultJson);
+
+        console.log('* Result:', result);
+        return result;
+    } catch (error) {
+        console.error("Error fetching Test Plan with ID ${testPlanID}:", error);
+        throw new Error(`Failed to fetch Test Plan with ID ${testPlanID}. Error: ${error.message}`);
+
+    }
+}
 
 //function test plan
 async function createTestPlan(contract: Contract, tpID: string, tpName: string, tpDesc: string, createdBy: string, dateCreated: string, isActive: string, isPublic: string): Promise<void> {
@@ -539,7 +617,7 @@ async function UpdateAsset(contract: Contract, id: string, tcdesc: string, dl: s
 }
 
 // update test plan
-async function UpdateTestPlan(contract: Contract, tpID: string, tpName: string, tpDesc: string, createdBy: string, dateCreated: string, isActive: string, isPublic: string): Promise<void> {
+async function UpdateTestPlan(contract: Contract, tpID: string, tpName: string, tpDesc: string, createdBy: string, dateCreated: string, updatedBy: string, dateUpdated: string, isActive: string, isPublic: string): Promise<void> {
     console.log('\n--> Submit Transaction: UpdateTestCase, updates an existing test case on the ledger');
 
     // Convert uid array to JSON string (if applicable)
@@ -551,31 +629,14 @@ async function UpdateTestPlan(contract: Contract, tpID: string, tpName: string, 
         tpName,
         tpDesc,
         createdBy,
-        dateCreated, //username
+        dateCreated,
+        updatedBy,
+        dateUpdated,
         isActive,
         isPublic,
     );
 
     console.log('*** Transaction committed successfully (Test Plan updated)');
-}
-
-async function GetTestPlanById(contract: Contract, testPlanID: string): Promise<any> {
-    console.log(`\n--> Evaluate Transaction: GetTestPlanById, fetching test plan details for ID: ${testPlanID}`);
-
-    try {
-        // Evaluate the transaction to query the test plan by ID
-        const resultBytes = await contract.evaluateTransaction('GetTestPlanById', testPlanID);
-
-        // Decode the response and parse the JSON
-        const resultJson = utf8Decoder.decode(resultBytes);
-        const result = JSON.parse(resultJson);
-
-        console.log('*** Result:', result);
-        return result;
-    } catch (error) {
-        console.error(`Error fetching Test Plan with ID ${testPlanID}:`, error);
-        throw new Error(`Failed to fetch Test Plan with ID ${testPlanID}. Error: ${error.message}`);
-    }
 }
 
 
@@ -608,7 +669,7 @@ async function transferAssetAsync(contract: Contract): Promise<void> {
 
     const status = await commit.getStatus();
     if (!status.successful) {
-        throw new Error(`Transaction ${status.transactionId} failed to commit with status code ${status.code}`);
+        throw new Error(`Transaction ${status.transactionId} failed to commit with status code ${status.code} `);
     }
 
     console.log('*** Transaction committed successfully');
@@ -698,13 +759,13 @@ function envOrDefault(key: string, defaultValue: string): string {
  * displayInputParameters() will print the global scope parameters used by the main driver routine.
  */
 async function displayInputParameters(): Promise<void> {
-    console.log(`channelName:       ${channelName}`);
-    console.log(`chaincodeName:     ${chaincodeName}`);
-    console.log(`mspId:             ${mspId}`);
-    console.log(`cryptoPath:        ${cryptoPath}`);
-    console.log(`keyDirectoryPath:  ${keyDirectoryPath}`);
-    console.log(`certPath:          ${certPath}`);
-    console.log(`tlsCertPath:       ${tlsCertPath}`);
-    console.log(`peerEndpoint:      ${peerEndpoint}`);
-    console.log(`peerHostAlias:     ${peerHostAlias}`);
+    console.log(`channelName:       ${channelName} `);
+    console.log(`chaincodeName:     ${chaincodeName} `);
+    console.log(`mspId:             ${mspId} `);
+    console.log(`cryptoPath:        ${cryptoPath} `);
+    console.log(`keyDirectoryPath:  ${keyDirectoryPath} `);
+    console.log(`certPath:          ${certPath} `);
+    console.log(`tlsCertPath:       ${tlsCertPath} `);
+    console.log(`peerEndpoint:      ${peerEndpoint} `);
+    console.log(`peerHostAlias:     ${peerHostAlias} `);
 }

@@ -85,6 +85,9 @@ export class TestPlanAsset {
   public dateCreated: string;
 
   @Property()
-  public username: string;
+  public updatedBy: string;
+
+  @Property()
+  public dateUpdated: string;
 
 }

@@ -5,9 +5,6 @@
 import { Context, Contract, Info, Returns, Transaction } from 'fabric-contract-api';
 import stringify from 'json-stringify-deterministic';
 import sortKeysRecursive from 'sort-keys-recursive';
-import { Asset, TestPlanAsset } from './asset';
-import Long from 'long';
-import { create } from 'domain';
 import { ClientIdentity } from 'fabric-shim';
 
 @Info({ title: 'AssetTransfer', description: 'Smart contract for trading assets' }) //for doc purpose
@@ -296,8 +293,10 @@ export class AssetTransferContract extends Contract {
             description: tpDesc,
             createdBy: createdBy,
             dateCreated: dateCreated,
-            active: isActive,
-            public: isPublic,
+            isActive: isActive,
+            isPublic: isPublic,
+            updatedBy: null,
+            dateUpdated: null,
 
         };
         // we insert data in alphabetic order using 'json-stringify-deterministic' and 'sort-keys-recursive'
@@ -309,6 +308,49 @@ export class AssetTransferContract extends Contract {
         const testPlanJSON = await ctx.stub.getState(tpID);
         return testPlanJSON && testPlanJSON.length > 0;
     }
+
+    @Transaction(false)
+    @Returns('string')
+    public async GetLatestTestPlanID(ctx: Context): Promise<string> {
+        const tpResults = [];
+        // Fetch all records using a range query
+        const iterator = await ctx.stub.getStateByRange('', ''); // Fetch all assets in the namespace
+        let result = await iterator.next();
+
+        while (!result.done) {
+            const strValue = Buffer.from(result.value.value.toString()).toString('utf8');
+            let record;
+            try {
+                record = JSON.parse(strValue); // Parse the record into JSON format
+            } catch (err) {
+                console.log(err);
+                record = strValue; // If JSON parsing fails, keep it as a string
+            }
+
+            // Filter to include only records with a testPlanID (i.e., the test plan data)
+            if (record.testPlanID) {
+                tpResults.push(record); // Add the record to the results array
+            }
+
+            result = await iterator.next();
+        }
+
+        if (tpResults.length === 0) {
+            // If no records found, return an error or a default value
+            return 'No test plans found';
+        }
+
+        // Sort the records by testPlanID (assuming it's numeric or a string that can be sorted)
+        tpResults.sort((a, b) => {
+            if (a.testPlanID > b.testPlanID) return 1;
+            if (a.testPlanID < b.testPlanID) return -1;
+            return 0;
+        });
+
+        // Return the latest (highest) testPlanID
+        return tpResults[tpResults.length - 1].testPlanID;
+    }
+
 
     // GetAllTestPlan returns all assets found in the world state.
     @Transaction(false)
@@ -341,6 +383,7 @@ export class AssetTransferContract extends Contract {
         return JSON.stringify(tpResults);
     }
 
+    // getTestPlanByID
     @Transaction(false)
     @Returns('string')
     public async GetTestPlanById(ctx: Context, testPlanID: string): Promise<string> {
@@ -374,7 +417,7 @@ export class AssetTransferContract extends Contract {
     }
 
     @Transaction()
-    public async UpdateTestPlan(ctx: Context, tpID: string, tpName: string, tpDesc: string, createdBy: string, dateCreated: string, isActive: string, isPublic: string): Promise<void> {
+    public async UpdateTestPlan(ctx: Context, tpID: string, tpName: string, tpDesc: string, createdBy: string, dateCreated: string, updatedBy: string, dateUpdated: string, isActive: string, isPublic: string): Promise<void> {
         const exists = await this.testPlanExists(ctx, tpID);
         if (!exists) {
             throw new Error(`The test plan ${tpID} does not exist`);
@@ -388,21 +431,13 @@ export class AssetTransferContract extends Contract {
             description: tpDesc,
             createdBy: createdBy,
             dateCreated: dateCreated,
-            active: isActive,
-            public: isPublic,
+            isActive: isActive,
+            isPublic: isPublic,
+            updatedBy: updatedBy,
+            dateUpdated: dateUpdated,
         };
         // we insert data in alphabetic order using 'json-stringify-deterministic' and 'sort-keys-recursive'
         return ctx.stub.putState(tpID, Buffer.from(stringify(sortKeysRecursive(updatedTestPlan))));
     }
 
-    /*@Transaction()
-    public async TransfeTestPlan(ctx: Context, tpID: string, newOwner: string): Promise<string> {
-        const assetString = await this.ReadAsset(ctx, tpID);
-        const asset = JSON.parse(assetString);
-        const oldOwner = asset.Owner;
-        asset.Owner = newOwner;
-        // we insert data in alphabetic order using 'json-stringify-deterministic' and 'sort-keys-recursive'
-        await ctx.stub.putState(tpID, Buffer.from(stringify(sortKeysRecursive(asset))));
-        return oldOwner;
-    }*/
 }
