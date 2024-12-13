@@ -38,6 +38,23 @@ export class Asset {
   @Property()
   public username: string;
 
+  @Property()
+  public testPlanID: string;
+
+  @Property()
+  public testSuiteID: string;
+
+  @Property()
+  public testSuiteName: string;
+
+  @Property()
+  public testSuiteDesc: string;
+
+  @Property()
+  pblic testSuiteStatus: string;
+
+  @Property()
+  public importance: string;
   // @Property()
   // public createdBy: string;
 

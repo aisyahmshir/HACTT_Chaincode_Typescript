@@ -12,9 +12,8 @@ import { tmpdir } from 'os';
 import * as path from 'path';
 import { TextDecoder } from 'util';
 
-
-let channelName = envOrDefault('CHANNEL_NAME', 'mychannel');
-let chaincodeName = envOrDefault('CHAINCODE_NAME', 'basic');
+const channelName = envOrDefault('CHANNEL_NAME', 'mychannel');
+const chaincodeName = envOrDefault('CHAINCODE_NAME', 'basic');
 const mspId = envOrDefault('MSP_ID', 'Org1MSP');
 
 // Path to crypto materials.
@@ -73,28 +72,25 @@ async function main(): Promise<void> {
     });
 
     try {
-        let network; // Global network variable
-        let contract; // Global contract variable
+        // Get a network instance representing the channel where the smart contract is deployed.
+        const network = gateway.getNetwork(channelName);
 
-        // Initialize network and contract based on the current channelName and chaincodeName
-        const initializeNetworkAndContract = async () => {
-            try {
-                network = await gateway.getNetwork(channelName); // Initialize the network
-                contract = network.getContract(chaincodeName); // Initialize the contract
-                console.log(`Connected to channel: ${channelName}, chaincode: ${chaincodeName}`);
-            } catch (error) {
-                console.error('Error initializing network and contract:', error);
-            }
-        };
+        // Get the smart contract from the network.
+        const contract = network.getContract(chaincodeName);
 
-        // Call initializeNetworkAndContract initially to set up the global variables
-        initializeNetworkAndContract();
+        // Initialize a set of asset data on the ledger using the chaincode 'InitLedger' function.
+        // await initLedger(contract);
 
+        // Return all the current assets on the ledger.
+        // await getAllAssets(contract);
 
         app.get('/', (req: any, res: any) => {
             res.send('Hello World!')
         })
 
+        app.get('/test', (req: any, res: any) => {
+            res.send("test")
+        })
 
         // Middleware to log incoming requests
         app.use((req: any, res: any, next: any) => {
@@ -105,22 +101,6 @@ async function main(): Promise<void> {
 
         app.use(bodyParser.urlencoded({ extended: true }));
         app.use(bodyParser.json());
-
-        // Route to change the channel and chaincode dynamically
-        app.post('/setChannelAndChaincode', async (req: any, res: any) => {
-            const { newChannel, newChaincode } = req.body; // Expecting newChannel and newChaincode in the request body
-
-            if (!newChannel || !newChaincode) {
-                return res.status(400).send({ error: 'Channel name and chaincode name are required' });
-            }
-
-            channelName = newChannel; // Update the channelName dynamically
-            chaincodeName = newChaincode; // Update the chaincodeName dynamically
-            await initializeNetworkAndContract(); // Reinitialize the network and contract
-
-            console.log(`Channel and chaincode updated to: ${channelName}, ${chaincodeName}`);
-            res.send({ message: `Channel and chaincode set to: ${channelName}, ${chaincodeName}` });
-        });
 
         // app.get('/initLedger', async (req: any, res: any) => {
         //     await initLedger(contract); // calls InitLedger function from smart contract
@@ -181,7 +161,7 @@ async function main(): Promise<void> {
 
             try {
                 await createAsset(contract, req.body.id, req.body.tcdesc, req.body.dl, req.body.pid,
-                    req.body.tcn, req.body.dtc, req.body.usrn, req.body.ostts);
+                    req.body.tcn, req.body.dtc, req.body.usrn, req.body.ostts, req.body.tpID);
                 const successMessage = { status: 'success', message: '*** Transaction createAsset committed successfully' };
                 res.send(JSON.stringify(successMessage));
             } catch (error) {
@@ -282,20 +262,6 @@ async function main(): Promise<void> {
                 res.send(JSON.stringify(successMessage));
             } catch (error) {
                 console.error(`Failed to create test plan: ${error}`);
-                res.status(500).json({ error: error.message });
-            }
-        });
-
-        //create test suite
-        app.post('/createTestSuite', async (req: any, res: any) => {
-            console.log("Create Test Suite:")
-            console.log(req.body);
-            try {
-                await createTestSuite(contract, req.body.tsID, req.body.tsName, req.body.tsDesc);
-                const successMessage = { status: 'success', message: '*** Transaction createAsset committed successfully' };
-                res.send(JSON.stringify(successMessage));
-            } catch (error) {
-                console.error(`Failed to create test suite: ${error}`);
                 res.status(500).json({ error: error.message });
             }
         });
@@ -518,7 +484,7 @@ async function getAllTestCasesWithHistory(contract: Contract): Promise<void> {
  * Submit a transaction synchronously, blocking until it has been committed to the ledger.
  */
 async function createAsset(contract: Contract, id: string, tcdesc: string, dl: string, pid: string,
-    tcn: string, dtc: string, usrn: string, ostts: string): Promise<void> {
+    tcn: string, dtc: string, usrn: string, ostts: string, tpID: string): Promise<void> {
     console.log('\n--> Submit Transaction: CreateAsset, creates new asset with ID, Project ID, etc arguments');
 
     // Convert uid array to JSON string
@@ -534,7 +500,7 @@ async function createAsset(contract: Contract, id: string, tcdesc: string, dl: s
         dtc,
         usrn,
         ostts,
-        //tpID,
+        tpID,
         // uid
         // stts,
 
@@ -636,24 +602,6 @@ async function createTestPlan(contract: Contract, tpID: string, tpName: string, 
     );
 
     console.log('*** Test Plan committed successfully');
-}
-
-//create test suite function
-//function test plan
-async function createTestSuite(contract: Contract, tsID: string, tsName: string, tsDesc: string): Promise<void> {
-    console.log('\n--> Submit Transaction: CreateTestPlan, creates new asset with ID, Project ID, etc arguments');
-
-    // Convert uid array to JSON string
-    // const uidJson = JSON.stringify(uid);
-
-    await contract.submitTransaction(
-        'CreateTestSuite',
-        tsID,
-        tsName,
-        tsDesc,
-    );
-
-    console.log('*** Test Suite committed successfully');
 }
 
 // Update Test Case Function

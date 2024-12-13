@@ -6,6 +6,7 @@ import { Context, Contract, Info, Returns, Transaction } from 'fabric-contract-a
 import stringify from 'json-stringify-deterministic';
 import sortKeysRecursive from 'sort-keys-recursive';
 import { ClientIdentity } from 'fabric-shim';
+import { tmpdir } from 'os';
 
 @Info({ title: 'AssetTransfer', description: 'Smart contract for trading assets' }) //for doc purpose
 export class AssetTransferContract extends Contract {
@@ -79,6 +80,7 @@ export class AssetTransferContract extends Contract {
             username: usrn,
             // status: stts,
             overallStatus: ostts,
+            //testPlanID: tpID,
             // userID: uid
             // userID: uid.split(",").map(Number),
 
@@ -309,6 +311,37 @@ export class AssetTransferContract extends Contract {
         return testPlanJSON && testPlanJSON.length > 0;
     }
 
+    //create test suite
+    @Transaction()
+    public async CreateTestSuite(ctx: Context, tsID: string, tsName: string, tsDesc: string): Promise<void> {
+        const exists = await this.testSuiteExists(ctx, tsID);
+        if (exists) {
+            throw new Error(`The test plan ${tsID} already exists`);
+        }
+
+        // Convert userID strings to number array
+        // const userID = uid.map(Number);
+
+        const asset = {
+            testSuiteID: tsID,
+            testSuiteName: tsName,
+            testSuiteDesc: tsDesc,
+            testSuiteStatus: null, // Default status
+            importance: null, // Default importance
+            //assignedUserIds: [],
+            //userStatuses: {},
+
+        };
+        // we insert data in alphabetic order using 'json-stringify-deterministic' and 'sort-keys-recursive'
+        await ctx.stub.putState(tsID, Buffer.from(stringify(sortKeysRecursive(asset))));
+    }
+
+    @Transaction(false)
+    public async testSuiteExists(ctx: Context, tsID: string): Promise<boolean> {
+        const testSuiteJSON = await ctx.stub.getState(tsID);
+        return testSuiteJSON && testSuiteJSON.length > 0;
+    }
+
     @Transaction(false)
     @Returns('string')
     public async GetLatestTestPlanID(ctx: Context): Promise<string> {
@@ -440,4 +473,29 @@ export class AssetTransferContract extends Contract {
         return ctx.stub.putState(tpID, Buffer.from(stringify(sortKeysRecursive(updatedTestPlan))));
     }
 
+    //assign test case
+    /*@Transaction()
+    public async AssignTestCaseToTestPlan(ctx: Context, id: string, tpID: string): Promise<void> {
+        const testCaseJSON = await ctx.stub.getState(id);
+    
+        if (!testCaseJSON || testCaseJSON.length === 0) {
+            throw new Error(`Test case with ID ${id} does not exist`);
+        }
+    
+        const testCase = JSON.parse(testCaseJSON.toString());
+    
+        // Check if the Test Plan exists
+        const testPlanJSON = await ctx.stub.getState(tpID);
+        if (!testPlanJSON || testPlanJSON.length === 0) {
+            throw new Error(`Test plan with ID ${tpID} does not exist`);
+        }
+    
+        // Assign the Test Case to the Test Plan
+        testCase.tpID = tpID;
+    
+        // Save updated Test Case back to the ledger
+        await ctx.stub.putState(id, Buffer.from(JSON.stringify(testCase)));
+    }
+    
+    */
 }
