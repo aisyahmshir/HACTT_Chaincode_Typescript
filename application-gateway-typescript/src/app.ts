@@ -174,6 +174,24 @@ async function main(): Promise<void> {
             }
         });
 
+        //getAllTestSuites
+        app.get('/getAllTestSuites', async (req: any, res: any) => {
+            try {
+                const allResults = await getAllTestSuites(contract);
+                const successMessage = { status: 'success', message: allResults };
+
+                // Explicitly set the Content-Type header to application/json
+                res.setHeader('Content-Type', 'application/json');
+                res.status(200).json(successMessage);
+            } catch (error) {
+                console.error("Error retrieving test plans:", error);
+
+                // Return an error response as JSON
+                res.setHeader('Content-Type', 'application/json');
+                res.status(500).json({ status: 'error', message: 'Failed to retrieve test plans', error: error.message });
+            }
+        });
+
         // Create a new asset on the ledger.
         app.post('/createTestCase', async (req: any, res: any) => {
             console.log("Create Test Case:")
@@ -291,7 +309,7 @@ async function main(): Promise<void> {
             console.log("Create Test Suite:")
             console.log(req.body);
             try {
-                await createTestSuite(contract, req.body.tsID, req.body.tsName, req.body.tsDesc);
+                await createTestSuite(contract, req.body.tsID, req.body.tsName, req.body.tsDesc, req.body.cb, req.body.dc);
                 const successMessage = { status: 'success', message: '*** Transaction createAsset committed successfully' };
                 res.send(JSON.stringify(successMessage));
             } catch (error) {
@@ -321,7 +339,27 @@ async function main(): Promise<void> {
             }
         });
 
+        //getLatestTestSuiteID
+        app.get('/getLatestTestSuiteID', async (req: any, res: any) => {
+            try {
+                // Call the GetLatestTestPlanID method in your chaincode
+                const latestID = await GetLatestTestPlanID(contract); // Replace 'contract' with your actual contract object
 
+                // Ensure the result is a string (it could be a Buffer, so we convert it to a string)
+                const latestIDString = latestID.toString().trim(); // Use .trim() to remove any extra spaces or newline chars
+
+                // Handle the case where there is no test plan ID or if the result is invalid
+                if (!latestIDString || latestIDString === 'No test plans found') {
+                    return res.status(404).json({ error: 'No test suites found or ID could not be determined' });
+                }
+
+                // Return the latest test plan ID as a JSON response
+                return res.json({ latestTestSuiteID: latestIDString.toString() });
+            } catch (error) {
+                console.error('Error fetching latest test plan ID:', error);
+                res.status(500).json({ error: error.message });
+            }
+        });
 
         //delete test plan
         app.delete('/deleteTestPlan', async (req: any, res: any) => {
@@ -338,6 +376,24 @@ async function main(): Promise<void> {
             } catch (error) {
                 console.error('Error deleting test plan:', error);
                 res.status(500).json({ error: 'Failed to delete test plan' });
+            }
+        })
+
+        //delete test suite
+        app.delete('/deleteTestSuite', async (req: any, res: any) => {
+            console.log('Received request body:', req.body);
+            // Check if ID is present in the request body
+            if (!req.body.tsID) {
+                return res.status(400).json({ error: 'Missing required field: id' });
+            }
+            // const testCaseID = req.body.id;
+            try {
+                await deleteTestSuite(contract, req.body.tsID);
+                const successMessage = { status: 'success', message: 'Test Suite deleted successfully' };
+                res.send(JSON.stringify(successMessage));
+            } catch (error) {
+                console.error('Error deleting test suite:', error);
+                res.status(500).json({ error: 'Failed to delete test suite' });
             }
         })
 
@@ -358,6 +414,28 @@ async function main(): Promise<void> {
                     res.status(404).json({ error: "Test Plan with ID ${req.params.id} does not exist. " });
                 } else {
                     res.status(500).json({ error: 'Failed to retrieve test plan.' });
+                }
+            }
+        });
+
+        //getTestSuiteByID
+        app.get('/getTestSuiteById/:id', async (req: any, res: any) => {
+            try {
+                const testSuiteID = req.params.id;
+
+                if (!testSuiteID) {
+                    return res.status(400).json({ error: 'Missing required path parameter: id' });
+                }
+
+                const testSuiteDetails = await GetTestSuiteByID(contract, testSuiteID);
+                res.status(200).json(testSuiteDetails);
+            } catch (error) {
+                console.error('Error fetching test suite:', error.message);
+
+                if (error.message.includes('does not exist')) {
+                    res.status(404).json({ error: "Test Suite with ID ${req.params.id} does not exist. " });
+                } else {
+                    res.status(500).json({ error: 'Failed to retrieve test suite.' });
                 }
             }
         });
@@ -425,9 +503,12 @@ async function main(): Promise<void> {
 
         await getAllTestPlansWithHistory(contract);
 
+        await getAllTestSuites(contract);
+
         //await GetTestPlanById(contract, testPlanID)
 
         await GetLatestTestPlanID(contract);
+        await GetLatestTestSuiteID(contract);
         // Update an existing asset asynchronously.
         // await transferAssetAsync(contract);
 
@@ -596,6 +677,31 @@ async function GetLatestTestPlanID(contract: Contract): Promise<string> {
     }
 }
 
+//getLatestTestSuiteID
+async function GetLatestTestSuiteID(contract: Contract): Promise<string> {
+    try {
+        console.log('\n--> Evaluate Transaction: GetLatestTestSuiteID, fetching the latest test suite ID');
+
+        // Call the chaincode function to get the latest test plan ID
+        const resultBytes = await contract.evaluateTransaction('GetLatestTestSuiteID');
+
+        // Decode the result (assuming it's a Buffer)
+        const resultJson = utf8Decoder.decode(resultBytes).trim(); // Trim any extra spaces or newline chars
+
+        // If the result is empty or invalid, handle accordingly
+        if (!resultJson || resultJson === 'No test plans found') {
+            throw new Error('No test suites found or unable to determine the latest ID');
+        }
+
+        console.log('*** Latest Test Suite ID:', resultJson);
+
+        // Return the latest test plan ID as a string
+        return resultJson;
+    } catch (error) {
+        console.error('Error fetching latest test suite ID:', error);
+        throw new Error(`Failed to fetch latest test suite ID: ${error.message}`);
+    }
+}
 
 async function GetTestPlanById(contract: Contract, testPlanID: string): Promise<any> {
     console.log("\n--> Evaluate Transaction: GetTestPlanById, fetching test plan details for ID: ${testPlanID}");
@@ -613,6 +719,38 @@ async function GetTestPlanById(contract: Contract, testPlanID: string): Promise<
     } catch (error) {
         console.error("Error fetching Test Plan with ID ${testPlanID}:", error);
         throw new Error(`Failed to fetch Test Plan with ID ${testPlanID}. Error: ${error.message}`);
+
+    }
+}
+
+//getAllTestSuites
+async function getAllTestSuites(contract: Contract): Promise<void> {
+    console.log('\n--> Evaluate Transaction: GetAllTestSuites, function returns all the current test cases on the ledger');
+
+    const resultBytes = await contract.evaluateTransaction('GetAllTestSuite');
+    const resultJson = utf8Decoder.decode(resultBytes);
+    const result = JSON.parse(resultJson);
+    console.log('*** Result:', result);
+    return result;
+}
+
+//getTestSuiteByID
+async function GetTestSuiteByID(contract: Contract, testSuiteID: string): Promise<any> {
+    console.log("\n--> Evaluate Transaction: GetTestSuiteByID, fetching test plan details for ID: ${testSuiteID}");
+
+    try {
+        // Evaluate the transaction to query the test plan by ID
+        const resultBytes = await contract.evaluateTransaction('GetTestSuiteByID', testSuiteID);
+
+        // Decode the response and parse the JSON
+        const resultJson = utf8Decoder.decode(resultBytes);
+        const result = JSON.parse(resultJson);
+
+        console.log('* Result:', result);
+        return result;
+    } catch (error) {
+        console.error("Error fetching Test Suite with ID ${testSuiteID}:", error);
+        throw new Error(`Failed to fetch Test Suite with ID ${testSuiteID}. Error: ${error.message}`);
 
     }
 }
@@ -640,7 +778,7 @@ async function createTestPlan(contract: Contract, tpID: string, tpName: string, 
 
 //create test suite function
 //function test plan
-async function createTestSuite(contract: Contract, tsID: string, tsName: string, tsDesc: string): Promise<void> {
+async function createTestSuite(contract: Contract, tsID: string, tsName: string, tsDesc: string, cb: string, dc: string): Promise<void> {
     console.log('\n--> Submit Transaction: CreateTestPlan, creates new asset with ID, Project ID, etc arguments');
 
     // Convert uid array to JSON string
@@ -651,6 +789,8 @@ async function createTestSuite(contract: Contract, tsID: string, tsName: string,
         tsID,
         tsName,
         tsDesc,
+        cb,
+        dc,
     );
 
     console.log('*** Test Suite committed successfully');
@@ -789,7 +929,17 @@ async function deleteTestPlan(contract: Contract, tpID: string): Promise<void> {
     // Submit transaction to delete the asset
     await contract.submitTransaction('DeleteTestPlan', tpID);
 
-    console.log('*** Transaction committed successfully (Test Case deleted)');
+    console.log('*** Transaction committed successfully (Test Plan deleted)');
+}
+
+//delete test suite
+async function deleteTestSuite(contract: Contract, tsID: string): Promise<void> {
+    console.log('\n--> Submit Transaction: DeleteTestSuite, function deletes test suite from the ledger');
+
+    // Submit transaction to delete the asset
+    await contract.submitTransaction('DeleteTestSuite', tsID);
+
+    console.log('*** Transaction committed successfully (Test Suite deleted)');
 }
 
 /**

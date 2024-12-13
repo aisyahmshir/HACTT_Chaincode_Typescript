@@ -313,7 +313,7 @@ export class AssetTransferContract extends Contract {
 
     //create test suite
     @Transaction()
-    public async CreateTestSuite(ctx: Context, tsID: string, tsName: string, tsDesc: string): Promise<void> {
+    public async CreateTestSuite(ctx: Context, tsID: string, tsName: string, tsDesc: string, cb: string, dc: string): Promise<void> {
         const exists = await this.testSuiteExists(ctx, tsID);
         if (exists) {
             throw new Error(`The test plan ${tsID} already exists`);
@@ -326,8 +326,10 @@ export class AssetTransferContract extends Contract {
             testSuiteID: tsID,
             testSuiteName: tsName,
             testSuiteDesc: tsDesc,
-            testSuiteStatus: null, // Default status
-            importance: null, // Default importance
+            testSuiteStatus: 'Pending', // Default status
+            importance: 'Medium',
+            createdBy: cb,
+            dateCreated: dc, // Default importance
             //assignedUserIds: [],
             //userStatuses: {},
 
@@ -384,6 +386,48 @@ export class AssetTransferContract extends Contract {
         return tpResults[tpResults.length - 1].testPlanID;
     }
 
+    //getLatestTestSuiteID
+    @Transaction(false)
+    @Returns('string')
+    public async GetLatestTestSuiteID(ctx: Context): Promise<string> {
+        const tsResults = [];
+        // Fetch all records using a range query
+        const iterator = await ctx.stub.getStateByRange('', ''); // Fetch all assets in the namespace
+        let result = await iterator.next();
+
+        while (!result.done) {
+            const strValue = Buffer.from(result.value.value.toString()).toString('utf8');
+            let record;
+            try {
+                record = JSON.parse(strValue); // Parse the record into JSON format
+            } catch (err) {
+                console.log(err);
+                record = strValue; // If JSON parsing fails, keep it as a string
+            }
+
+            // Filter to include only records with a testPlanID (i.e., the test plan data)
+            if (record.testSuiteID) {
+                tsResults.push(record); // Add the record to the results array
+            }
+
+            result = await iterator.next();
+        }
+
+        if (tsResults.length === 0) {
+            // If no records found, return an error or a default value
+            return 'No test plans found';
+        }
+
+        // Sort the records by testPlanID (assuming it's numeric or a string that can be sorted)
+        tsResults.sort((a, b) => {
+            if (a.testSuiteID > b.testSuiteID) return 1;
+            if (a.testSuiteID < b.testSuiteID) return -1;
+            return 0;
+        });
+
+        // Return the latest (highest) testPlanID
+        return tsResults[tsResults.length - 1].testSuiteID;
+    }
 
     // GetAllTestPlan returns all assets found in the world state.
     @Transaction(false)
@@ -416,6 +460,37 @@ export class AssetTransferContract extends Contract {
         return JSON.stringify(tpResults);
     }
 
+    // GetAllTestSuite
+    @Transaction(false)
+    @Returns('string')
+    public async GetAllTestSuite(ctx: Context): Promise<string> {
+        const tsResults = [];
+        // range query with empty string for startKey and endKey does an open-ended query of all assets in the chaincode namespace.
+        const iterator = await ctx.stub.getStateByRange('', ''); // Fetch all records
+        let result = await iterator.next();
+
+        while (!result.done) {
+            const strValue = Buffer.from(result.value.value.toString()).toString('utf8');
+            let record;
+            try {
+                record = JSON.parse(strValue); // Parse the record into JSON format
+            } catch (err) {
+                console.log(err);
+                record = strValue; // If JSON parsing fails, keep it as a string
+            }
+
+            // Filter to include only records with a testPlanID (i.e., the test plan data)
+            if (record.testSuiteID) {
+                tsResults.push(record); // Add the record to the results array
+            }
+
+            result = await iterator.next();
+        }
+
+        // Return only the test plan records as a JSON array
+        return JSON.stringify(tsResults);
+    }
+
     // getTestPlanByID
     @Transaction(false)
     @Returns('string')
@@ -438,6 +513,28 @@ export class AssetTransferContract extends Contract {
         return testPlan;
     }
 
+    // getTestSuiteByID
+    @Transaction(false)
+    @Returns('string')
+    public async GetTestSuiteByID(ctx: Context, testSuiteID: string): Promise<string> {
+        // Check if the test plan exists
+        const exists = await this.testSuiteExists(ctx, testSuiteID);
+        if (!exists) {
+            throw new Error(`Test Suite with ID ${testSuiteID} does not exist`);
+        }
+
+        // Get the test plan from the world state
+        const testSuiteBytes = await ctx.stub.getState(testSuiteID);
+
+        if (!testSuiteBytes || testSuiteBytes.length === 0) {
+            throw new Error(`Test Plan with ID ${testSuiteID} is empty or does not exist`);
+        }
+
+        // Convert test plan bytes to a string and return
+        const testSuite = testSuiteBytes.toString();
+        return testSuite;
+    }
+
     //delete test plan
     // DeleteAsset deletes an given asset from the world state.
     @Transaction()
@@ -447,6 +544,16 @@ export class AssetTransferContract extends Contract {
             throw new Error(`The asset ${testplanID} does not exist`);
         }
         return ctx.stub.deleteState(testplanID);
+    }
+
+    //delete test suite
+    @Transaction()
+    public async DeleteTestSuite(ctx: Context, testSuiteID: string): Promise<void> {
+        const exists = await this.testSuiteExists(ctx, testSuiteID);
+        if (!exists) {
+            throw new Error(`The asset ${testSuiteID} does not exist`);
+        }
+        return ctx.stub.deleteState(testSuiteID);
     }
 
     @Transaction()
