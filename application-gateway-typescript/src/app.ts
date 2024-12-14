@@ -343,7 +343,7 @@ async function main(): Promise<void> {
         app.get('/getLatestTestSuiteID', async (req: any, res: any) => {
             try {
                 // Call the GetLatestTestPlanID method in your chaincode
-                const latestID = await GetLatestTestPlanID(contract); // Replace 'contract' with your actual contract object
+                const latestID = await GetLatestTestSuiteID(contract); // Replace 'contract' with your actual contract object
 
                 // Ensure the result is a string (it could be a Buffer, so we convert it to a string)
                 const latestIDString = latestID.toString().trim(); // Use .trim() to remove any extra spaces or newline chars
@@ -461,6 +461,26 @@ async function main(): Promise<void> {
             }
         });
 
+        //update test suite
+        app.post('/updateTestSuite', async (req: any, res: any) => {
+            console.log('Received request body:', req.body);
+
+            // Check if required fields (id) are present
+            if (!req.body.tsID) {
+                return res.status(400).json({ error: 'Missing required field: id' });
+            }
+            console.log("Update Test Suite:")
+            console.log(req.body);
+
+            try {
+                await UpdateTestSuite(contract, req.body.tsID, req.body.tsName, req.body.tsDesc, req.body.tsStatus, req.body.imp, req.body.cb, req.body.dc);
+                const successMessage = { status: 'success', message: 'Test suite updated successfully' };
+                res.send(JSON.stringify(successMessage));
+            } catch (error) {
+                console.error('Error updating test suite:', error);
+                res.status(500).json({ error: error.message });
+            }
+        });
 
         // returns the ID associated with the invoking identity.
         app.get('/getClientID', async (req: any, res: any) => {
@@ -844,6 +864,26 @@ async function UpdateTestPlan(contract: Contract, tpID: string, tpName: string, 
     console.log('*** Transaction committed successfully (Test Plan updated)');
 }
 
+//update test suite
+async function UpdateTestSuite(contract: Contract, tsID: string, tsName: string, tsDesc: string, tsStatus: string, imp: string, cb: string, dc: string): Promise<void> {
+    console.log('\n--> Submit Transaction: UpdateTestSuite, updates an existing test suite on the ledger');
+
+    // Convert uid array to JSON string (if applicable)
+    // const uidJson = JSON.stringify(uid);
+
+    await contract.submitTransaction(
+        'UpdateTestSuite',
+        tsID,
+        tsName,
+        tsDesc,
+        tsStatus, // Default status
+        imp,
+        cb,
+        dc,
+    );
+
+    console.log('*** Transaction committed successfully (Test Suite updated)');
+}
 
 // update only overall status of the asset
 async function UpdateTestCaseStatus(contract: Contract, id: string, ostts: string): Promise<void> {

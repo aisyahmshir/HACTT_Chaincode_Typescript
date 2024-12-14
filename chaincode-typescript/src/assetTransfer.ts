@@ -580,6 +580,29 @@ export class AssetTransferContract extends Contract {
         return ctx.stub.putState(tpID, Buffer.from(stringify(sortKeysRecursive(updatedTestPlan))));
     }
 
+    //update test suite
+    @Transaction()
+    public async UpdateTestSuite(ctx: Context, tsID: string, tsName: string, tsDesc: string, tsStatus: string, imp: string, cb: string, dc: string): Promise<void> {
+        const exists = await this.testSuiteExists(ctx, tsID);
+        if (!exists) {
+            throw new Error(`The test suite ${tsID} does not exist`);
+        }
+
+        //TODO update with new variables
+        // overwriting original asset with new asset
+        const updatedTestSuite = {
+            testSuiteID: tsID,
+            testSuiteName: tsName,
+            testSuiteDesc: tsDesc,
+            testSuiteStatus: tsStatus, // Default status
+            importance: imp,
+            createdBy: cb,
+            dateCreated: dc,
+        };
+        // we insert data in alphabetic order using 'json-stringify-deterministic' and 'sort-keys-recursive'
+        return ctx.stub.putState(tsID, Buffer.from(stringify(sortKeysRecursive(updatedTestSuite))));
+    }
+
     //assign test case
     /*@Transaction()
     public async AssignTestCaseToTestPlan(ctx: Context, id: string, tpID: string): Promise<void> {
