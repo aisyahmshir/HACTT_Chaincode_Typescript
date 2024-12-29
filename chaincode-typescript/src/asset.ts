@@ -51,10 +51,13 @@ export class Asset {
   public testSuiteDesc: string;
 
   @Property()
-  public testSuiteStatus: string;
+  pblic testSuiteStatus: string;
 
   @Property()
   public importance: string;
+
+  @Property()
+  public testID: string;
   // @Property()
   // public createdBy: string;
 

@@ -305,6 +305,32 @@ export class AssetTransferContract extends Contract {
         await ctx.stub.putState(tpID, Buffer.from(stringify(sortKeysRecursive(asset))));
     }
 
+    //test function
+    //TEST PLAN
+    @Transaction()
+    public async CreateTest(ctx: Context, testID: string): Promise<void> {
+        const exists = await this.testExists(ctx, testID);
+        if (exists) {
+            throw new Error(`The test plan ${testID} already exists`);
+        }
+
+        // Convert userID strings to number array
+        // const userID = uid.map(Number);
+
+        const asset = {
+            testID: testID,
+
+        };
+        // we insert data in alphabetic order using 'json-stringify-deterministic' and 'sort-keys-recursive'
+        await ctx.stub.putState(testID, Buffer.from(stringify(sortKeysRecursive(asset))));
+    }
+
+    @Transaction(false)
+    public async testExists(ctx: Context, testID: string): Promise<boolean> {
+        const testPlanJSON = await ctx.stub.getState(testID);
+        return testPlanJSON && testPlanJSON.length > 0;
+    }
+
     @Transaction(false)
     public async testPlanExists(ctx: Context, tpID: string): Promise<boolean> {
         const testPlanJSON = await ctx.stub.getState(tpID);
@@ -313,14 +339,14 @@ export class AssetTransferContract extends Contract {
 
     //create test suite
     @Transaction()
-    public async CreateTestSuite(ctx: Context, tsID: string, tsName: string, tsDesc: string, cb: string, dc: string): Promise<void> {
+    public async CreateTestSuite(ctx: Context, tsID: string, tsName: string, tsDesc: string, cb: string, dc: string, assignedTestPlanIDs: string): Promise<void> {
         const exists = await this.testSuiteExists(ctx, tsID);
         if (exists) {
             throw new Error(`The test plan ${tsID} already exists`);
         }
 
-        // Convert userID strings to number array
-        // const userID = uid.map(Number);
+        // Parse the JSON string into an array
+        const assignedTestPlans = JSON.parse(assignedTestPlanIDs);
 
         const asset = {
             testSuiteID: tsID,
@@ -329,7 +355,8 @@ export class AssetTransferContract extends Contract {
             testSuiteStatus: 'Pending', // Default status
             importance: 'Medium',
             createdBy: cb,
-            dateCreated: dc, // Default importance
+            dateCreated: dc,
+            assignedTestPlans: assignedTestPlans || [], // Default importance
             //assignedUserIds: [],
             //userStatuses: {},
 
@@ -582,12 +609,13 @@ export class AssetTransferContract extends Contract {
 
     //update test suite
     @Transaction()
-    public async UpdateTestSuite(ctx: Context, tsID: string, tsName: string, tsDesc: string, tsStatus: string, imp: string, cb: string, dc: string): Promise<void> {
+    public async UpdateTestSuite(ctx: Context, tsID: string, tsName: string, tsDesc: string, tsStatus: string, imp: string, cb: string, dc: string, assignedTestPlanIDs: string): Promise<void> {
         const exists = await this.testSuiteExists(ctx, tsID);
         if (!exists) {
             throw new Error(`The test suite ${tsID} does not exist`);
         }
 
+        const assignedTestPlans = JSON.parse(assignedTestPlanIDs);
         //TODO update with new variables
         // overwriting original asset with new asset
         const updatedTestSuite = {
@@ -598,10 +626,29 @@ export class AssetTransferContract extends Contract {
             importance: imp,
             createdBy: cb,
             dateCreated: dc,
+            assignedTestPlans: assignedTestPlans || [],
         };
         // we insert data in alphabetic order using 'json-stringify-deterministic' and 'sort-keys-recursive'
         return ctx.stub.putState(tsID, Buffer.from(stringify(sortKeysRecursive(updatedTestSuite))));
     }
+
+    @Transaction()
+    public async AssignTestPlansToTestSuite(
+        ctx: Context,
+        testSuiteID: string,
+        testPlanIDs: string[]
+    ): Promise<void> {
+        const testSuiteJSON = await ctx.stub.getState(testSuiteID);
+        if (!testSuiteJSON || testSuiteJSON.length === 0) {
+            throw new Error(`TestSuite ${testSuiteID} does not exist`);
+        }
+
+        const testSuite = JSON.parse(testSuiteJSON.toString());
+        testSuite.assignedTestPlans = testPlanIDs;
+
+        await ctx.stub.putState(testSuiteID, Buffer.from(JSON.stringify(testSuite)));
+    }
+
 
     //assign test case
     /*@Transaction()
@@ -628,4 +675,44 @@ export class AssetTransferContract extends Contract {
     }
     
     */
+
+    @Transaction(false)
+    @Returns('string')
+    public async GetTestPlansForTestSuite(ctx: Context, tsID: string): Promise<string> {
+        console.log("\n--> GetTestPlansForTestSuite: Fetching TestPlans for TestSuiteID:", tsID);
+
+        // Step 1: Retrieve the TestSuite by ID
+        const testSuiteBytes = await ctx.stub.getState(tsID);
+        if (!testSuiteBytes || testSuiteBytes.length === 0) {
+            throw new Error(`Test Suite with ID ${tsID} does not exist`);
+        }
+
+        // Parse the TestSuite from bytes to JSON
+        const testSuite = JSON.parse(testSuiteBytes.toString());
+
+        // Step 2: Retrieve the assigned TestPlan IDs from the TestSuite
+        const assignedTestPlanIDs = testSuite.assignedTestPlanIDs; // Assuming 'assignedTestPlanIDs' is an array in the TestSuite object
+
+        if (!assignedTestPlanIDs || assignedTestPlanIDs.length === 0) {
+            throw new Error(`No TestPlans are assigned to Test Suite with ID ${tsID}`);
+        }
+
+        // Step 3: Fetch the TestPlan names for each TestPlanID
+        const testPlanNames: string[] = [];
+
+        for (const tpID of assignedTestPlanIDs) {
+            const testPlanBytes = await ctx.stub.getState(tpID);
+            if (!testPlanBytes || testPlanBytes.length === 0) {
+                console.warn(`Test Plan with ID ${tpID} does not exist or has been deleted`);
+                continue;
+            }
+
+            const testPlan = JSON.parse(testPlanBytes.toString());
+            testPlanNames.push(testPlan.tpName); // Assuming 'name' is a property in the TestPlan object
+        }
+
+        // Step 4: Return the list of TestPlan names
+        return JSON.stringify(testPlanNames);
+    }
+
 }

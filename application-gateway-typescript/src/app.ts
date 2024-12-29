@@ -304,12 +304,26 @@ async function main(): Promise<void> {
             }
         });
 
+        //test function
+        app.post('/createTest', async (req: any, res: any) => {
+            console.log("Create Test:")
+            console.log(req.body);
+            try {
+                await createTest(contract, req.body.testID);
+                const successMessage = { status: 'success', message: '*** Transaction createAsset committed successfully' };
+                res.send(JSON.stringify(successMessage));
+            } catch (error) {
+                console.error(`Failed to create test plan: ${error}`);
+                res.status(500).json({ error: error.message });
+            }
+        });
+
         //create test suite
         app.post('/createTestSuite', async (req: any, res: any) => {
             console.log("Create Test Suite:")
             console.log(req.body);
             try {
-                await createTestSuite(contract, req.body.tsID, req.body.tsName, req.body.tsDesc, req.body.cb, req.body.dc);
+                await createTestSuite(contract, req.body.tsID, req.body.tsName, req.body.tsDesc, req.body.cb, req.body.dc, req.body.assignedTestPlanIDs);
                 const successMessage = { status: 'success', message: '*** Transaction createAsset committed successfully' };
                 res.send(JSON.stringify(successMessage));
             } catch (error) {
@@ -473,7 +487,7 @@ async function main(): Promise<void> {
             console.log(req.body);
 
             try {
-                await UpdateTestSuite(contract, req.body.tsID, req.body.tsName, req.body.tsDesc, req.body.tsStatus, req.body.imp, req.body.cb, req.body.dc);
+                await UpdateTestSuite(contract, req.body.tsID, req.body.tsName, req.body.tsDesc, req.body.tsStatus, req.body.imp, req.body.cb, req.body.dc, req.body.assignedTestPlanIDs);
                 const successMessage = { status: 'success', message: 'Test suite updated successfully' };
                 res.send(JSON.stringify(successMessage));
             } catch (error) {
@@ -488,6 +502,30 @@ async function main(): Promise<void> {
             const successMessage = { status: 'success', message: '*** Transaction getClientID committed successfully' };
             res.send(JSON.stringify(successMessage));
         })
+
+        app.get('/getTestPlansForTestSuite/:id', async (req: any, res: any) => {
+            try {
+                const testSuiteID = req.params.id;
+
+                if (!testSuiteID) {
+                    return res.status(400).json({ error: 'Missing required path parameter: id' });
+                }
+
+                // Call the chaincode function to get the TestPlans for the TestSuite
+                const testPlanNames = await GetTestPlansForTestSuite(contract, testSuiteID);
+
+                // Return the TestPlan names as the response
+                res.status(200).json(testPlanNames);
+            } catch (error) {
+                console.error('Error fetching test plans:', error.message);
+
+                if (error.message.includes('does not exist')) {
+                    res.status(404).json({ error: `Test Suite with ID ${req.params.id} does not exist.` });
+                } else {
+                    res.status(500).json({ error: error.message });
+                }
+            }
+        });
 
         // assign test case
         /*app.post('/assignTestCaseToTestPlan', async (req: any, res: any) => {
@@ -796,9 +834,24 @@ async function createTestPlan(contract: Contract, tpID: string, tpName: string, 
     console.log('*** Test Plan committed successfully');
 }
 
+//test function
+async function createTest(contract: Contract, testID: string): Promise<void> {
+    console.log('\n--> Submit Transaction: CreateTest, creates new asset with ID, Project ID, etc arguments');
+
+    // Convert uid array to JSON string
+    // const uidJson = JSON.stringify(uid);
+
+    await contract.submitTransaction(
+        'CreateTest',
+        testID,
+    );
+
+    console.log('*** Test committed successfully');
+}
+
 //create test suite function
 //function test plan
-async function createTestSuite(contract: Contract, tsID: string, tsName: string, tsDesc: string, cb: string, dc: string): Promise<void> {
+async function createTestSuite(contract: Contract, tsID: string, tsName: string, tsDesc: string, cb: string, dc: string, assignedTestPlanIDs: string[]): Promise<void> {
     console.log('\n--> Submit Transaction: CreateTestPlan, creates new asset with ID, Project ID, etc arguments');
 
     // Convert uid array to JSON string
@@ -811,6 +864,7 @@ async function createTestSuite(contract: Contract, tsID: string, tsName: string,
         tsDesc,
         cb,
         dc,
+        JSON.stringify(assignedTestPlanIDs),
     );
 
     console.log('*** Test Suite committed successfully');
@@ -865,7 +919,7 @@ async function UpdateTestPlan(contract: Contract, tpID: string, tpName: string, 
 }
 
 //update test suite
-async function UpdateTestSuite(contract: Contract, tsID: string, tsName: string, tsDesc: string, tsStatus: string, imp: string, cb: string, dc: string): Promise<void> {
+async function UpdateTestSuite(contract: Contract, tsID: string, tsName: string, tsDesc: string, tsStatus: string, imp: string, cb: string, dc: string, assignedTestPlanIDs: string[]): Promise<void> {
     console.log('\n--> Submit Transaction: UpdateTestSuite, updates an existing test suite on the ledger');
 
     // Convert uid array to JSON string (if applicable)
@@ -880,6 +934,7 @@ async function UpdateTestSuite(contract: Contract, tsID: string, tsName: string,
         imp,
         cb,
         dc,
+        JSON.stringify(assignedTestPlanIDs),
     );
 
     console.log('*** Transaction committed successfully (Test Suite updated)');
@@ -1033,3 +1088,22 @@ async function displayInputParameters(): Promise<void> {
     console.log('*** Test Case assigned to Test Plan successfully');
 }*/
 
+// Function to interact with the chaincode (using the contract)
+async function GetTestPlansForTestSuite(contract: Contract, tsID: string): Promise<any> {
+    console.log(`--> Calling chaincode GetTestPlansForTestSuite to fetch TestPlans for TestSuiteID: ${tsID}`);
+
+    try {
+        // Invoke the chaincode to fetch TestPlans for the TestSuite
+        const resultBytes = await contract.evaluateTransaction('GetTestPlansForTestSuite', tsID);
+
+        // Decode the response and parse it into JSON
+        const resultJson = utf8Decoder.decode(resultBytes);
+        const result = JSON.parse(resultJson);
+
+        console.log('* Result:', result);
+        return result;
+    } catch (error) {
+        console.error(`Error fetching Test Plans for TestSuiteID ${tsID}:`, error);
+        throw new Error(`Failed to fetch Test Plans for TestSuiteID ${tsID}. Error: ${error.message}`);
+    }
+}
