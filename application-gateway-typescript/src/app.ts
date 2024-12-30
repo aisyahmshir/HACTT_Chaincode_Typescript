@@ -192,6 +192,35 @@ async function main(): Promise<void> {
             }
         });
 
+        app.get('/getAllBuildsWithHistory', async (req: any, res: any) => {
+            try {
+                const allResults = await getAllBuildsWithHistory(contract);
+                const successMessage = { status: 'success', message: allResults };
+                res.send(JSON.stringify(successMessage)); // Only response sent
+            } catch (error) {
+                console.error('Error fetching builds:', error);
+                res.status(500).json({ status: 'error', message: 'Failed to fetch builds' });
+            }
+        });
+
+        //getAllTestSuites
+        app.get('/getAllBuilds', async (req: any, res: any) => {
+            try {
+                const allResults = await getAllBuilds(contract);
+                const successMessage = { status: 'success', message: allResults };
+
+                // Explicitly set the Content-Type header to application/json
+                res.setHeader('Content-Type', 'application/json');
+                res.status(200).json(successMessage);
+            } catch (error) {
+                console.error("Error retrieving builds:", error);
+
+                // Return an error response as JSON
+                res.setHeader('Content-Type', 'application/json');
+                res.status(500).json({ status: 'error', message: 'Failed to retrieve builds', error: error.message });
+            }
+        });
+
         // Create a new asset on the ledger.
         app.post('/createTestCase', async (req: any, res: any) => {
             console.log("Create Test Case:")
@@ -304,20 +333,6 @@ async function main(): Promise<void> {
             }
         });
 
-        //test function
-        app.post('/createTest', async (req: any, res: any) => {
-            console.log("Create Test:")
-            console.log(req.body);
-            try {
-                await createTest(contract, req.body.testID);
-                const successMessage = { status: 'success', message: '*** Transaction createAsset committed successfully' };
-                res.send(JSON.stringify(successMessage));
-            } catch (error) {
-                console.error(`Failed to create test plan: ${error}`);
-                res.status(500).json({ error: error.message });
-            }
-        });
-
         //create test suite
         app.post('/createTestSuite', async (req: any, res: any) => {
             console.log("Create Test Suite:")
@@ -328,6 +343,20 @@ async function main(): Promise<void> {
                 res.send(JSON.stringify(successMessage));
             } catch (error) {
                 console.error(`Failed to create test suite: ${error}`);
+                res.status(500).json({ error: error.message });
+            }
+        });
+
+        //create build
+        app.post('/createBuild', async (req: any, res: any) => {
+            console.log("Create Build:")
+            console.log(req.body);
+            try {
+                await createBuild(contract, req.body.bId, req.body.bTitle, req.body.bDesc, req.body.bActive, req.body.bOpen, req.body.bReleaseDate, req.body.bVersion);
+                const successMessage = { status: 'success', message: '*** Transaction createBuild committed successfully' };
+                res.send(JSON.stringify(successMessage));
+            } catch (error) {
+                console.error(`Failed to create build: ${error}`);
                 res.status(500).json({ error: error.message });
             }
         });
@@ -375,6 +404,28 @@ async function main(): Promise<void> {
             }
         });
 
+        //getLatestBuildID
+        app.get('/getLatestBuildID', async (req: any, res: any) => {
+            try {
+                // Call the GetLatestTestPlanID method in your chaincode
+                const latestID = await GetLatestBuildID(contract); // Replace 'contract' with your actual contract object
+
+                // Ensure the result is a string (it could be a Buffer, so we convert it to a string)
+                const latestIDString = latestID.toString().trim(); // Use .trim() to remove any extra spaces or newline chars
+
+                // Handle the case where there is no test plan ID or if the result is invalid
+                if (!latestIDString || latestIDString === 'No builds found') {
+                    return res.status(404).json({ error: 'No builds found or ID could not be determined' });
+                }
+
+                // Return the latest test plan ID as a JSON response
+                return res.json({ latestBuildID: latestIDString.toString() });
+            } catch (error) {
+                console.error('Error fetching latest build ID:', error);
+                res.status(500).json({ error: error.message });
+            }
+        });
+
         //delete test plan
         app.delete('/deleteTestPlan', async (req: any, res: any) => {
             console.log('Received request body:', req.body);
@@ -408,6 +459,24 @@ async function main(): Promise<void> {
             } catch (error) {
                 console.error('Error deleting test suite:', error);
                 res.status(500).json({ error: 'Failed to delete test suite' });
+            }
+        })
+
+        //delete build
+        app.delete('/deleteBuild', async (req: any, res: any) => {
+            console.log('Received request body:', req.body);
+            // Check if ID is present in the request body
+            if (!req.body.bId) {
+                return res.status(400).json({ error: 'Missing required field: id' });
+            }
+            // const testCaseID = req.body.id;
+            try {
+                await deleteBuild(contract, req.body.bId);
+                const successMessage = { status: 'success', message: 'Build deleted successfully' };
+                res.send(JSON.stringify(successMessage));
+            } catch (error) {
+                console.error('Error deleting build:', error);
+                res.status(500).json({ error: 'Failed to delete build' });
             }
         })
 
@@ -454,6 +523,28 @@ async function main(): Promise<void> {
             }
         });
 
+        //getBuildByID
+        app.get('/getBuildByID/:id', async (req: any, res: any) => {
+            try {
+                const buildID = req.params.id;
+
+                if (!buildID) {
+                    return res.status(400).json({ error: 'Missing required path parameter: id' });
+                }
+
+                const buildDetails = await GetBuildByID(contract, buildID);
+                res.status(200).json(buildDetails);
+            } catch (error) {
+                console.error('Error fetching build:', error.message);
+
+                if (error.message.includes('does not exist')) {
+                    res.status(404).json({ error: error.message });
+                } else {
+                    res.status(500).json({ error: 'Failed to retrieve build.' });
+                }
+            }
+        });
+
         //update test plan
         app.post('/updateTestPlan', async (req: any, res: any) => {
             console.log('Received request body:', req.body);
@@ -492,6 +583,27 @@ async function main(): Promise<void> {
                 res.send(JSON.stringify(successMessage));
             } catch (error) {
                 console.error('Error updating test suite:', error);
+                res.status(500).json({ error: error.message });
+            }
+        });
+
+        //update build
+        app.post('/updateBuild', async (req: any, res: any) => {
+            console.log('Received request body:', req.body);
+
+            // Check if required fields (id) are present
+            if (!req.body.bId) {
+                return res.status(400).json({ error: 'Missing required field: id' });
+            }
+            console.log("Update Build:")
+            console.log(req.body);
+
+            try {
+                await UpdateBuild(contract, req.body.bId, req.body.bTitle, req.body.bDesc, req.body.bActive, req.body.bOpen, req.body.bReleaseDate, req.body.bVersion);
+                const successMessage = { status: 'success', message: 'Build updated successfully' };
+                res.send(JSON.stringify(successMessage));
+            } catch (error) {
+                console.error('Error updating build:', error);
                 res.status(500).json({ error: error.message });
             }
         });
@@ -563,10 +675,15 @@ async function main(): Promise<void> {
 
         await getAllTestSuites(contract);
 
+        await getAllBuildsWithHistory(contract);
+
+        await getAllBuilds(contract);
+
         //await GetTestPlanById(contract, testPlanID)
 
         await GetLatestTestPlanID(contract);
         await GetLatestTestSuiteID(contract);
+        await GetLatestBuildID(contract);
         // Update an existing asset asynchronously.
         // await transferAssetAsync(contract);
 
@@ -710,6 +827,34 @@ async function getAllTestPlansWithHistory(contract: Contract): Promise<void> {
     return filteredAssets;
 }
 
+//function get
+async function getAllBuilds(contract: Contract): Promise<void> {
+    console.log('\n--> Evaluate Transaction: GetAllBuilds, function returns all the current build on the ledger');
+
+    const resultBytes = await contract.evaluateTransaction('GetAllBuild');
+    const resultJson = utf8Decoder.decode(resultBytes);
+    const result = JSON.parse(resultJson);
+    console.log('*** Result:', result);
+    return result;
+}
+
+async function getAllBuildsWithHistory(contract: Contract): Promise<void> {
+    console.log('\n--> Evaluate Transaction: GetAllBuildsWithHistory, function returns all the current builds with their history on the ledger');
+
+    const resultBytes = await contract.evaluateTransaction('GetAllAssetsWithHistory');
+
+    const resultJson = utf8Decoder.decode(resultBytes);
+    const result = JSON.parse(resultJson);
+
+    // Filter assets that have the property idtest_cases
+    const filteredAssets = result.filter(
+        (asset: any) => asset.history[0]?.Value?.buildID !== undefined
+    );
+
+    console.log('*** Result:', filteredAssets);
+    return filteredAssets;
+}
+
 async function GetLatestTestPlanID(contract: Contract): Promise<string> {
     try {
         console.log('\n--> Evaluate Transaction: GetLatestTestPlanID, fetching the latest test plan ID');
@@ -781,6 +926,26 @@ async function GetTestPlanById(contract: Contract, testPlanID: string): Promise<
     }
 }
 
+async function GetBuildByID(contract: Contract, buildID: string): Promise<any> {
+    console.log("\n--> Evaluate Transaction: GetBuildByID, fetching build details for ID: ${buildID}");
+
+    try {
+        // Evaluate the transaction to query the test plan by ID
+        const resultBytes = await contract.evaluateTransaction('GetBuildByID', buildID);
+
+        // Decode the response and parse the JSON
+        const resultJson = utf8Decoder.decode(resultBytes);
+        const result = JSON.parse(resultJson);
+
+        console.log('* Result:', result);
+        return result;
+    } catch (error) {
+        console.error("Error fetching Build with ID ${buildID}:", error);
+        throw new Error(`Failed to fetch Build with ID ${buildID}. Error: ${error.message}`);
+
+    }
+}
+
 //getAllTestSuites
 async function getAllTestSuites(contract: Contract): Promise<void> {
     console.log('\n--> Evaluate Transaction: GetAllTestSuites, function returns all the current test cases on the ledger');
@@ -834,21 +999,6 @@ async function createTestPlan(contract: Contract, tpID: string, tpName: string, 
     console.log('*** Test Plan committed successfully');
 }
 
-//test function
-async function createTest(contract: Contract, testID: string): Promise<void> {
-    console.log('\n--> Submit Transaction: CreateTest, creates new asset with ID, Project ID, etc arguments');
-
-    // Convert uid array to JSON string
-    // const uidJson = JSON.stringify(uid);
-
-    await contract.submitTransaction(
-        'CreateTest',
-        testID,
-    );
-
-    console.log('*** Test committed successfully');
-}
-
 //create test suite function
 //function test plan
 async function createTestSuite(contract: Contract, tsID: string, tsName: string, tsDesc: string, cb: string, dc: string, assignedTestPlanIDs: string[]): Promise<void> {
@@ -868,6 +1018,27 @@ async function createTestSuite(contract: Contract, tsID: string, tsName: string,
     );
 
     console.log('*** Test Suite committed successfully');
+}
+
+//create build
+async function createBuild(contract: Contract, bId: string, bTitle: string, bDesc: string, bActive: string, bOpen: string, bReleaseDate: string, bVersion: string): Promise<void> {
+    console.log('\n--> Submit Transaction: CreateBuild, creates new asset with ID, Project ID, etc arguments');
+
+    // Convert uid array to JSON string
+    // const uidJson = JSON.stringify(uid);
+
+    await contract.submitTransaction(
+        'CreateBuild',
+        bId,
+        bTitle,
+        bDesc,
+        bActive,
+        bOpen,
+        bReleaseDate,
+        bVersion,
+    );
+
+    console.log('*** Build committed successfully');
 }
 
 // Update Test Case Function
@@ -938,6 +1109,24 @@ async function UpdateTestSuite(contract: Contract, tsID: string, tsName: string,
     );
 
     console.log('*** Transaction committed successfully (Test Suite updated)');
+}
+
+// update build
+async function UpdateBuild(contract: Contract, bId: string, bTitle: string, bDesc: string, bActive: string, bOpen: string, bReleaseDate: string, bVersion: string): Promise<void> {
+    console.log('\n--> Submit Transaction: UpdateBuild, updates an existing build on the ledger');
+
+    await contract.submitTransaction(
+        'UpdateBuild',
+        bId,
+        bTitle,
+        bDesc,
+        bActive,
+        bOpen,
+        bReleaseDate,
+        bVersion,
+    );
+
+    console.log('*** Transaction committed successfully (Build updated)');
 }
 
 // update only overall status of the asset
@@ -1035,6 +1224,16 @@ async function deleteTestSuite(contract: Contract, tsID: string): Promise<void> 
     await contract.submitTransaction('DeleteTestSuite', tsID);
 
     console.log('*** Transaction committed successfully (Test Suite deleted)');
+}
+
+//delete test suite
+async function deleteBuild(contract: Contract, bId: string): Promise<void> {
+    console.log('\n--> Submit Transaction: DeleteBuild, function deletes build from the ledger');
+
+    // Submit transaction to delete the asset
+    await contract.submitTransaction('DeleteBuild', bId);
+
+    console.log('*** Transaction committed successfully (Build deleted)');
 }
 
 /**

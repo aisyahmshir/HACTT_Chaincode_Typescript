@@ -305,32 +305,6 @@ export class AssetTransferContract extends Contract {
         await ctx.stub.putState(tpID, Buffer.from(stringify(sortKeysRecursive(asset))));
     }
 
-    //test function
-    //TEST PLAN
-    @Transaction()
-    public async CreateTest(ctx: Context, testID: string): Promise<void> {
-        const exists = await this.testExists(ctx, testID);
-        if (exists) {
-            throw new Error(`The test plan ${testID} already exists`);
-        }
-
-        // Convert userID strings to number array
-        // const userID = uid.map(Number);
-
-        const asset = {
-            testID: testID,
-
-        };
-        // we insert data in alphabetic order using 'json-stringify-deterministic' and 'sort-keys-recursive'
-        await ctx.stub.putState(testID, Buffer.from(stringify(sortKeysRecursive(asset))));
-    }
-
-    @Transaction(false)
-    public async testExists(ctx: Context, testID: string): Promise<boolean> {
-        const testPlanJSON = await ctx.stub.getState(testID);
-        return testPlanJSON && testPlanJSON.length > 0;
-    }
-
     @Transaction(false)
     public async testPlanExists(ctx: Context, tpID: string): Promise<boolean> {
         const testPlanJSON = await ctx.stub.getState(tpID);
@@ -369,6 +343,33 @@ export class AssetTransferContract extends Contract {
     public async testSuiteExists(ctx: Context, tsID: string): Promise<boolean> {
         const testSuiteJSON = await ctx.stub.getState(tsID);
         return testSuiteJSON && testSuiteJSON.length > 0;
+    }
+
+    //Create Build
+    @Transaction()
+    public async CreateBuild(ctx: Context, bId: string, bTitle: string, bDesc: string, bActive: string, bOpen: string, bReleaseDate: string, bVersion: string): Promise<void> {
+        const exists = await this.buildExists(ctx, bId);
+        if (exists) {
+            throw new Error(`The test BUILD ${bId} already exists`);
+        }
+
+        const asset = {
+            buildID: bId,
+            buildTitle: bTitle,
+            buildDescription: bDesc,
+            isBuildActive: bActive,
+            isBuildOpen: bOpen,
+            buildReleaseDate: bReleaseDate,
+            buildVersion: bVersion,
+        };
+        // we insert data in alphabetic order using 'json-stringify-deterministic' and 'sort-keys-recursive'
+        await ctx.stub.putState(bId, Buffer.from(stringify(sortKeysRecursive(asset))));
+    }
+
+    @Transaction(false)
+    public async buildExists(ctx: Context, bId: string): Promise<boolean> {
+        const buildJSON = await ctx.stub.getState(bId);
+        return buildJSON && buildJSON.length > 0;
     }
 
     @Transaction(false)
@@ -456,6 +457,49 @@ export class AssetTransferContract extends Contract {
         return tsResults[tsResults.length - 1].testSuiteID;
     }
 
+    //getLatestBuildID
+    @Transaction(false)
+    @Returns('string')
+    public async GetLatestBuildID(ctx: Context): Promise<string> {
+        const bResults = [];
+        // Fetch all records using a range query
+        const iterator = await ctx.stub.getStateByRange('', ''); // Fetch all assets in the namespace
+        let result = await iterator.next();
+
+        while (!result.done) {
+            const strValue = Buffer.from(result.value.value.toString()).toString('utf8');
+            let record;
+            try {
+                record = JSON.parse(strValue); // Parse the record into JSON format
+            } catch (err) {
+                console.log(err);
+                record = strValue; // If JSON parsing fails, keep it as a string
+            }
+
+            // Filter to include only records with a testPlanID (i.e., the test plan data)
+            if (record.buildID) {
+                bResults.push(record); // Add the record to the results array
+            }
+
+            result = await iterator.next();
+        }
+
+        if (bResults.length === 0) {
+            // If no records found, return an error or a default value
+            return 'No test plans found';
+        }
+
+        // Sort the records by testPlanID (assuming it's numeric or a string that can be sorted)
+        bResults.sort((a, b) => {
+            if (a.buildID > b.buildID) return 1;
+            if (a.buildID < b.buildID) return -1;
+            return 0;
+        });
+
+        // Return the latest (highest) testPlanID
+        return bResults[bResults.length - 1].buildID;
+    }
+
     // GetAllTestPlan returns all assets found in the world state.
     @Transaction(false)
     @Returns('string')
@@ -518,6 +562,37 @@ export class AssetTransferContract extends Contract {
         return JSON.stringify(tsResults);
     }
 
+    // GetAllBuilds
+    @Transaction(false)
+    @Returns('string')
+    public async GetAllBuild(ctx: Context): Promise<string> {
+        const bResults = [];
+        // range query with empty string for startKey and endKey does an open-ended query of all assets in the chaincode namespace.
+        const iterator = await ctx.stub.getStateByRange('', ''); // Fetch all records
+        let result = await iterator.next();
+
+        while (!result.done) {
+            const strValue = Buffer.from(result.value.value.toString()).toString('utf8');
+            let record;
+            try {
+                record = JSON.parse(strValue); // Parse the record into JSON format
+            } catch (err) {
+                console.log(err);
+                record = strValue; // If JSON parsing fails, keep it as a string
+            }
+
+            // Filter to include only records with a testPlanID (i.e., the test plan data)
+            if (record.buildID) {
+                bResults.push(record); // Add the record to the results array
+            }
+
+            result = await iterator.next();
+        }
+
+        // Return only the test plan records as a JSON array
+        return JSON.stringify(bResults);
+    }
+
     // getTestPlanByID
     @Transaction(false)
     @Returns('string')
@@ -562,6 +637,28 @@ export class AssetTransferContract extends Contract {
         return testSuite;
     }
 
+    // getTestSuiteByID
+    @Transaction(false)
+    @Returns('string')
+    public async GetBuildByID(ctx: Context, buildID: string): Promise<string> {
+        // Check if the test plan exists
+        const exists = await this.buildExists(ctx, buildID);
+        if (!exists) {
+            throw new Error(`Build with ID ${buildID} does not exist`);
+        }
+
+        // Get the test plan from the world state
+        const buildBytes = await ctx.stub.getState(buildID);
+
+        if (!buildBytes || buildBytes.length === 0) {
+            throw new Error(`Build with ID ${buildID} is empty or does not exist`);
+        }
+
+        // Convert test plan bytes to a string and return
+        const build = buildBytes.toString();
+        return build;
+    }
+
     //delete test plan
     // DeleteAsset deletes an given asset from the world state.
     @Transaction()
@@ -581,6 +678,16 @@ export class AssetTransferContract extends Contract {
             throw new Error(`The asset ${testSuiteID} does not exist`);
         }
         return ctx.stub.deleteState(testSuiteID);
+    }
+
+    //delete build
+    @Transaction()
+    public async DeleteBuild(ctx: Context, buildID: string): Promise<void> {
+        const exists = await this.buildExists(ctx, buildID);
+        if (!exists) {
+            throw new Error(`The asset ${buildID} does not exist`);
+        }
+        return ctx.stub.deleteState(buildID);
     }
 
     @Transaction()
@@ -630,6 +737,29 @@ export class AssetTransferContract extends Contract {
         };
         // we insert data in alphabetic order using 'json-stringify-deterministic' and 'sort-keys-recursive'
         return ctx.stub.putState(tsID, Buffer.from(stringify(sortKeysRecursive(updatedTestSuite))));
+    }
+
+    //update build
+    @Transaction()
+    public async UpdateBuild(ctx: Context, bId: string, bTitle: string, bDesc: string, bActive: string, bOpen: string, bReleaseDate: string, bVersion: string): Promise<void> {
+        const exists = await this.buildExists(ctx, bId);
+        if (!exists) {
+            throw new Error(`The build ${bId} does not exist`);
+        }
+
+        //TODO update with new variables
+        // overwriting original asset with new asset
+        const updatedBuild = {
+            buildID: bId,
+            buildTitle: bTitle,
+            buildDescription: bDesc,
+            isBuildActive: bActive,
+            isBuildOpen: bOpen,
+            buildReleaseDate: bReleaseDate,
+            buildVersion: bVersion,
+        };
+        // we insert data in alphabetic order using 'json-stringify-deterministic' and 'sort-keys-recursive'
+        return ctx.stub.putState(bId, Buffer.from(stringify(sortKeysRecursive(updatedBuild))));
     }
 
     @Transaction()

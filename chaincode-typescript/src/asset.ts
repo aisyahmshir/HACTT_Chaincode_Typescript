@@ -58,6 +58,28 @@ export class Asset {
 
   @Property()
   public testID: string;
+
+  @Property()
+  public buildID: string;
+
+  @Property()
+  public buildTitle: string;
+
+  @Property()
+  public buildDescription: string;
+
+  @Property()
+  public isBuildActive: string;
+
+  @Property()
+  public isBuildOpen: string;
+
+  @Property()
+  public buildReleaseDate: string;
+
+  @Property()
+  public buildVersion: string;
+
   // @Property()
   // public createdBy: string;
 
