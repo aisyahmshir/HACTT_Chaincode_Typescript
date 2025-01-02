@@ -280,7 +280,7 @@ export class AssetTransferContract extends Contract {
 
     //TEST PLAN
     @Transaction()
-    public async CreateTestPlan(ctx: Context, tpID: string, tpName: string, tpDesc: string, createdBy: string, dateCreated: string, isActive: string, isPublic: string, assignedTestSuiteIDs: string): Promise<void> {
+    public async CreateTestPlan(ctx: Context, tpID: string, tpName: string, tpDesc: string, createdBy: string, dateCreated: string, isActive: string, isPublic: string, assignedTestSuiteIDs: string, assignedBuildID: string): Promise<void> {
         const exists = await this.testPlanExists(ctx, tpID);
         if (exists) {
             throw new Error(`The test plan ${tpID} already exists`);
@@ -300,6 +300,7 @@ export class AssetTransferContract extends Contract {
             updatedBy: null,
             dateUpdated: null,
             assignedTestSuites: assignedTestSuites || [],
+            assignedBuild: assignedBuildID,
 
         };
         // we insert data in alphabetic order using 'json-stringify-deterministic' and 'sort-keys-recursive'
@@ -688,7 +689,7 @@ export class AssetTransferContract extends Contract {
     }
 
     @Transaction()
-    public async UpdateTestPlan(ctx: Context, tpID: string, tpName: string, tpDesc: string, createdBy: string, dateCreated: string, updatedBy: string, dateUpdated: string, isActive: string, isPublic: string, assignedTestSuiteIDs: string): Promise<void> {
+    public async UpdateTestPlan(ctx: Context, tpID: string, tpName: string, tpDesc: string, createdBy: string, dateCreated: string, updatedBy: string, dateUpdated: string, isActive: string, isPublic: string, assignedTestSuiteIDs: string, assignedBuildID: String): Promise<void> {
         const exists = await this.testPlanExists(ctx, tpID);
         if (!exists) {
             throw new Error(`The test plan ${tpID} does not exist`);
@@ -708,6 +709,7 @@ export class AssetTransferContract extends Contract {
             updatedBy: updatedBy,
             dateUpdated: dateUpdated,
             assignedTestSuites: assignedTestSuites || [],
+            assignedBuild: assignedBuildID,
         };
         // we insert data in alphabetic order using 'json-stringify-deterministic' and 'sort-keys-recursive'
         return ctx.stub.putState(tpID, Buffer.from(stringify(sortKeysRecursive(updatedTestPlan))));

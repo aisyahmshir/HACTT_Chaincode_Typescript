@@ -324,7 +324,7 @@ async function main(): Promise<void> {
             console.log(req.body);
             try {
                 await createTestPlan(contract, req.body.tpID, req.body.tpName, req.body.tpDesc, req.body.createdBy,
-                    req.body.dateCreated, req.body.isActive, req.body.isPublic, req.body.assignedTestSuiteIDs);
+                    req.body.dateCreated, req.body.isActive, req.body.isPublic, req.body.assignedTestSuiteIDs, req.body.assignedBuildID);
                 const successMessage = { status: 'success', message: '*** Transaction createAsset committed successfully' };
                 res.send(JSON.stringify(successMessage));
             } catch (error) {
@@ -557,7 +557,7 @@ async function main(): Promise<void> {
             console.log(req.body);
 
             try {
-                await UpdateTestPlan(contract, req.body.tpID, req.body.tpName, req.body.tpDesc, req.body.createdBy, req.body.dateCreated, req.body.updatedBy, req.body.dateUpdated, req.body.isActive, req.body.isPublic, req.body.assignedTestSuiteIDs);
+                await UpdateTestPlan(contract, req.body.tpID, req.body.tpName, req.body.tpDesc, req.body.createdBy, req.body.dateCreated, req.body.updatedBy, req.body.dateUpdated, req.body.isActive, req.body.isPublic, req.body.assignedTestSuiteIDs, req.body.assignedBuildID);
                 const successMessage = { status: 'success', message: 'Test plan updated successfully' };
                 res.send(JSON.stringify(successMessage));
             } catch (error) {
@@ -1005,7 +1005,7 @@ async function GetTestSuiteByID(contract: Contract, testSuiteID: string): Promis
 }
 
 //function test plan
-async function createTestPlan(contract: Contract, tpID: string, tpName: string, tpDesc: string, createdBy: string, dateCreated: string, isActive: string, isPublic: string, assignedTestSuiteIDs: string): Promise<void> {
+async function createTestPlan(contract: Contract, tpID: string, tpName: string, tpDesc: string, createdBy: string, dateCreated: string, isActive: string, isPublic: string, assignedTestSuiteIDs: string, assignedBuildID: string): Promise<void> {
     console.log('\n--> Submit Transaction: CreateTestPlan, creates new asset with ID, Project ID, etc arguments');
 
     // Convert uid array to JSON string
@@ -1021,6 +1021,7 @@ async function createTestPlan(contract: Contract, tpID: string, tpName: string, 
         isActive,
         isPublic,
         JSON.stringify(assignedTestSuiteIDs),
+        assignedBuildID,
     );
 
     console.log('*** Test Plan committed successfully');
@@ -1029,7 +1030,7 @@ async function createTestPlan(contract: Contract, tpID: string, tpName: string, 
 //create test suite function
 //function test plan
 async function createTestSuite(contract: Contract, tsID: string, tsName: string, tsDesc: string, cb: string, dc: string): Promise<void> {
-    console.log('\n--> Submit Transaction: CreateTestPlan, creates new asset with ID, Project ID, etc arguments');
+    console.log('\n--> Submit Transaction: CreateTestSuite, creates new asset with ID, Project ID, etc arguments');
 
     // Convert uid array to JSON string
     // const uidJson = JSON.stringify(uid);
@@ -1093,7 +1094,7 @@ async function UpdateAsset(contract: Contract, id: string, tcdesc: string, dl: s
 }
 
 // update test plan
-async function UpdateTestPlan(contract: Contract, tpID: string, tpName: string, tpDesc: string, createdBy: string, dateCreated: string, updatedBy: string, dateUpdated: string, isActive: string, isPublic: string, assignedTestSuiteIDs: string): Promise<void> {
+async function UpdateTestPlan(contract: Contract, tpID: string, tpName: string, tpDesc: string, createdBy: string, dateCreated: string, updatedBy: string, dateUpdated: string, isActive: string, isPublic: string, assignedTestSuiteIDs: string, assignedBuildID: string): Promise<void> {
     console.log('\n--> Submit Transaction: UpdateTestCase, updates an existing test case on the ledger');
 
     // Convert uid array to JSON string (if applicable)
@@ -1111,6 +1112,7 @@ async function UpdateTestPlan(contract: Contract, tpID: string, tpName: string, 
         isActive,
         isPublic,
         JSON.stringify(assignedTestSuiteIDs),
+        assignedBuildID,
     );
 
     console.log('*** Transaction committed successfully (Test Plan updated)');
