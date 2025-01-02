@@ -324,7 +324,7 @@ async function main(): Promise<void> {
             console.log(req.body);
             try {
                 await createTestPlan(contract, req.body.tpID, req.body.tpName, req.body.tpDesc, req.body.createdBy,
-                    req.body.dateCreated, req.body.isActive, req.body.isPublic);
+                    req.body.dateCreated, req.body.isActive, req.body.isPublic, req.body.assignedTestSuiteIDs);
                 const successMessage = { status: 'success', message: '*** Transaction createAsset committed successfully' };
                 res.send(JSON.stringify(successMessage));
             } catch (error) {
@@ -338,7 +338,7 @@ async function main(): Promise<void> {
             console.log("Create Test Suite:")
             console.log(req.body);
             try {
-                await createTestSuite(contract, req.body.tsID, req.body.tsName, req.body.tsDesc, req.body.cb, req.body.dc, req.body.assignedTestPlanIDs);
+                await createTestSuite(contract, req.body.tsID, req.body.tsName, req.body.tsDesc, req.body.cb, req.body.dc);
                 const successMessage = { status: 'success', message: '*** Transaction createAsset committed successfully' };
                 res.send(JSON.stringify(successMessage));
             } catch (error) {
@@ -557,7 +557,7 @@ async function main(): Promise<void> {
             console.log(req.body);
 
             try {
-                await UpdateTestPlan(contract, req.body.tpID, req.body.tpName, req.body.tpDesc, req.body.createdBy, req.body.dateCreated, req.body.updatedBy, req.body.dateUpdated, req.body.isActive, req.body.isPublic);
+                await UpdateTestPlan(contract, req.body.tpID, req.body.tpName, req.body.tpDesc, req.body.createdBy, req.body.dateCreated, req.body.updatedBy, req.body.dateUpdated, req.body.isActive, req.body.isPublic, req.body.assignedTestSuiteIDs);
                 const successMessage = { status: 'success', message: 'Test plan updated successfully' };
                 res.send(JSON.stringify(successMessage));
             } catch (error) {
@@ -578,7 +578,7 @@ async function main(): Promise<void> {
             console.log(req.body);
 
             try {
-                await UpdateTestSuite(contract, req.body.tsID, req.body.tsName, req.body.tsDesc, req.body.tsStatus, req.body.imp, req.body.cb, req.body.dc, req.body.assignedTestPlanIDs);
+                await UpdateTestSuite(contract, req.body.tsID, req.body.tsName, req.body.tsDesc, req.body.tsStatus, req.body.imp, req.body.cb, req.body.dc);
                 const successMessage = { status: 'success', message: 'Test suite updated successfully' };
                 res.send(JSON.stringify(successMessage));
             } catch (error) {
@@ -906,6 +906,32 @@ async function GetLatestTestSuiteID(contract: Contract): Promise<string> {
     }
 }
 
+//getLatestTestSuiteID
+async function GetLatestBuildID(contract: Contract): Promise<string> {
+    try {
+        console.log('\n--> Evaluate Transaction: GetLatestBuildID, fetching the latest build ID');
+
+        // Call the chaincode function to get the latest test plan ID
+        const resultBytes = await contract.evaluateTransaction('GetLatestBuildID');
+
+        // Decode the result (assuming it's a Buffer)
+        const resultJson = utf8Decoder.decode(resultBytes).trim(); // Trim any extra spaces or newline chars
+
+        // If the result is empty or invalid, handle accordingly
+        if (!resultJson || resultJson === 'No build found') {
+            throw new Error('No build found or unable to determine the latest ID');
+        }
+
+        console.log('*** Latest build ID:', resultJson);
+
+        // Return the latest test plan ID as a string
+        return resultJson;
+    } catch (error) {
+        console.error('Error fetching latest build ID:', error);
+        throw new Error(`Failed to fetch latest build ID: ${error.message}`);
+    }
+}
+
 async function GetTestPlanById(contract: Contract, testPlanID: string): Promise<any> {
     console.log("\n--> Evaluate Transaction: GetTestPlanById, fetching test plan details for ID: ${testPlanID}");
 
@@ -979,7 +1005,7 @@ async function GetTestSuiteByID(contract: Contract, testSuiteID: string): Promis
 }
 
 //function test plan
-async function createTestPlan(contract: Contract, tpID: string, tpName: string, tpDesc: string, createdBy: string, dateCreated: string, isActive: string, isPublic: string): Promise<void> {
+async function createTestPlan(contract: Contract, tpID: string, tpName: string, tpDesc: string, createdBy: string, dateCreated: string, isActive: string, isPublic: string, assignedTestSuiteIDs: string): Promise<void> {
     console.log('\n--> Submit Transaction: CreateTestPlan, creates new asset with ID, Project ID, etc arguments');
 
     // Convert uid array to JSON string
@@ -994,6 +1020,7 @@ async function createTestPlan(contract: Contract, tpID: string, tpName: string, 
         dateCreated,
         isActive,
         isPublic,
+        JSON.stringify(assignedTestSuiteIDs),
     );
 
     console.log('*** Test Plan committed successfully');
@@ -1001,7 +1028,7 @@ async function createTestPlan(contract: Contract, tpID: string, tpName: string, 
 
 //create test suite function
 //function test plan
-async function createTestSuite(contract: Contract, tsID: string, tsName: string, tsDesc: string, cb: string, dc: string, assignedTestPlanIDs: string[]): Promise<void> {
+async function createTestSuite(contract: Contract, tsID: string, tsName: string, tsDesc: string, cb: string, dc: string): Promise<void> {
     console.log('\n--> Submit Transaction: CreateTestPlan, creates new asset with ID, Project ID, etc arguments');
 
     // Convert uid array to JSON string
@@ -1014,7 +1041,6 @@ async function createTestSuite(contract: Contract, tsID: string, tsName: string,
         tsDesc,
         cb,
         dc,
-        JSON.stringify(assignedTestPlanIDs),
     );
 
     console.log('*** Test Suite committed successfully');
@@ -1067,7 +1093,7 @@ async function UpdateAsset(contract: Contract, id: string, tcdesc: string, dl: s
 }
 
 // update test plan
-async function UpdateTestPlan(contract: Contract, tpID: string, tpName: string, tpDesc: string, createdBy: string, dateCreated: string, updatedBy: string, dateUpdated: string, isActive: string, isPublic: string): Promise<void> {
+async function UpdateTestPlan(contract: Contract, tpID: string, tpName: string, tpDesc: string, createdBy: string, dateCreated: string, updatedBy: string, dateUpdated: string, isActive: string, isPublic: string, assignedTestSuiteIDs: string): Promise<void> {
     console.log('\n--> Submit Transaction: UpdateTestCase, updates an existing test case on the ledger');
 
     // Convert uid array to JSON string (if applicable)
@@ -1084,13 +1110,14 @@ async function UpdateTestPlan(contract: Contract, tpID: string, tpName: string, 
         dateUpdated,
         isActive,
         isPublic,
+        JSON.stringify(assignedTestSuiteIDs),
     );
 
     console.log('*** Transaction committed successfully (Test Plan updated)');
 }
 
 //update test suite
-async function UpdateTestSuite(contract: Contract, tsID: string, tsName: string, tsDesc: string, tsStatus: string, imp: string, cb: string, dc: string, assignedTestPlanIDs: string[]): Promise<void> {
+async function UpdateTestSuite(contract: Contract, tsID: string, tsName: string, tsDesc: string, tsStatus: string, imp: string, cb: string, dc: string): Promise<void> {
     console.log('\n--> Submit Transaction: UpdateTestSuite, updates an existing test suite on the ledger');
 
     // Convert uid array to JSON string (if applicable)
@@ -1105,7 +1132,6 @@ async function UpdateTestSuite(contract: Contract, tsID: string, tsName: string,
         imp,
         cb,
         dc,
-        JSON.stringify(assignedTestPlanIDs),
     );
 
     console.log('*** Transaction committed successfully (Test Suite updated)');
