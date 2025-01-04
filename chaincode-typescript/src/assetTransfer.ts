@@ -61,14 +61,15 @@ export class AssetTransferContract extends Contract {
     // CreateAsset issues a new asset to the world state with given details.
     @Transaction()
     public async CreateAsset(ctx: Context, id: string, tcdesc: string, dl: string, pid: string,
-        tcn: string, dtc: string, usrn: string, ostts: string): Promise<void> {
+        tcn: string, dtc: string, usrn: string, ostts: string, tcSteps: string): Promise<void> {
         const exists = await this.AssetExists(ctx, id);
         if (exists) {
             throw new Error(`The asset ${id} already exists`);
         }
 
-        // Convert userID strings to number array
-        // const userID = uid.map(Number);
+        // Parse the JSON string into an array
+        const testCaseSteps = JSON.parse(tcSteps);
+
 
         const asset = {
             idtest_cases: id,
@@ -83,6 +84,7 @@ export class AssetTransferContract extends Contract {
             //testPlanID: tpID,
             // userID: uid
             // userID: uid.split(",").map(Number),
+            testCaseSteps: testCaseSteps || [],
 
         };
         // we insert data in alphabetic order using 'json-stringify-deterministic' and 'sort-keys-recursive'

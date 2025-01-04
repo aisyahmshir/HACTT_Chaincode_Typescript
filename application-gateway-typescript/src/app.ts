@@ -228,7 +228,7 @@ async function main(): Promise<void> {
 
             try {
                 await createAsset(contract, req.body.id, req.body.tcdesc, req.body.dl, req.body.pid,
-                    req.body.tcn, req.body.dtc, req.body.usrn, req.body.ostts);
+                    req.body.tcn, req.body.dtc, req.body.usrn, req.body.ostts, req.body.tcSteps);
                 const successMessage = { status: 'success', message: '*** Transaction createAsset committed successfully' };
                 res.send(JSON.stringify(successMessage));
             } catch (error) {
@@ -774,7 +774,7 @@ async function getAllTestCasesWithHistory(contract: Contract): Promise<void> {
  * Submit a transaction synchronously, blocking until it has been committed to the ledger.
  */
 async function createAsset(contract: Contract, id: string, tcdesc: string, dl: string, pid: string,
-    tcn: string, dtc: string, usrn: string, ostts: string): Promise<void> {
+    tcn: string, dtc: string, usrn: string, ostts: string, tcSteps: string): Promise<void> {
     console.log('\n--> Submit Transaction: CreateAsset, creates new asset with ID, Project ID, etc arguments');
 
     // Convert uid array to JSON string
@@ -790,6 +790,7 @@ async function createAsset(contract: Contract, id: string, tcdesc: string, dl: s
         dtc,
         usrn,
         ostts,
+        JSON.stringify(tcSteps),
         //tpID,
         // uid
         // stts,
